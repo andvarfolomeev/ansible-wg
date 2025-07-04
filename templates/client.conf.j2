@@ -1,0 +1,10 @@
+[Interface]
+PrivateKey = {{ item.private_key }}
+Address = {{ item.allowed_ips }}
+DNS = 8.8.8.8
+
+[Peer]
+PublicKey = {{ interface.public_key }}
+Endpoint = {{ interface.endpoint }}
+AllowedIPs = 0.0.0.0/0, ::/0
+PersistentKeepalive = 25

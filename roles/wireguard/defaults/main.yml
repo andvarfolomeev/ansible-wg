@@ -1,0 +1,29 @@
+---
+# WireGuard role configuration
+
+# Mode can be 'server' or 'client'
+wireguard_mode: server
+
+# Interface configuration
+wireguard_address: "10.0.0.1/24"
+wireguard_listen_port: 51820
+
+# Keys are generated if not provided
+# wireguard_private_key: ""
+# wireguard_public_key: ""
+
+# Network interface for NAT (server mode)
+wireguard_nat_interface: eth0
+
+# Client configuration generation
+wireguard_generate_client_configs: false
+client_configs_dir: "./clients"
+
+# DNS servers for clients
+wireguard_dns_servers: "8.8.8.8, 8.8.4.4"
+
+# Client persistent keepalive in seconds
+wireguard_persistent_keepalive: 25
+
+# Default allowed IPs (0.0.0.0/0 routes all traffic through VPN)
+wireguard_allowed_ips: "0.0.0.0/0, ::/0"

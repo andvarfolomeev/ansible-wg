@@ -1,0 +1,10 @@
+[Interface]
+PrivateKey = {{ item.private_key }}
+Address = {{ item.allowed_ips }}
+DNS = {{ wireguard_dns_servers | default('8.8.8.8') }}
+
+[Peer]
+PublicKey = {{ interface.public_key }}
+Endpoint = {{ interface.endpoint }}
+AllowedIPs = {{ wireguard_allowed_ips | default('0.0.0.0/0, ::/0') }}
+PersistentKeepalive = {{ wireguard_persistent_keepalive | default(25) }}

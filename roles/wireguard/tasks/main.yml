@@ -1,0 +1,84 @@
+---
+# prepare
+
+- name: Install required packages
+  apt:
+    name:
+      - wireguard
+      - wireguard-tools
+      - qrencode
+      - iproute2
+      - iptables
+    state: present
+    update_cache: true
+
+# create server config
+
+- name: Create WireGuard directory
+  file:
+    path: /etc/wireguard
+    state: directory
+    mode: "0700"
+
+- name: Configure WireGuard interface
+  template:
+    src: server.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: "0600"
+
+# ip forwarding
+
+- name: Ensure net.ipv4.ip_forward is set
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    reload: yes
+  when: wireguard_mode == 'server'
+
+# restart WireGuard
+
+- name: Check if WireGuard interface is already up
+  shell: ip link show wg0 || echo "not found"
+  register: wg_status
+  changed_when: false
+
+- name: Restart WireGuard interface manually (no systemd)
+  command: "{{ item }}"
+  with_items:
+    - wg-quick down wg0
+    - wg-quick up wg0
+  when: ansible_service_mgr != "systemd" and "not found" not in wg_status.stdout
+
+- name: Bring up WireGuard interface manually (no systemd)
+  command: wg-quick up wg0
+  when: ansible_service_mgr != "systemd" and "not found" in wg_status.stdout
+
+- name: Restart WireGuard via systemd if already running
+  systemd:
+    name: wg-quick@wg0
+    state: restarted
+    enabled: true
+  when: ansible_service_mgr == "systemd" and "not found" not in wg_status.stdout
+
+- name: Enable and start WireGuard via systemd if not running
+  systemd:
+    name: wg-quick@wg0
+    enabled: true
+    state: started
+  when: ansible_service_mgr == "systemd" and "not found" in wg_status.stdout
+
+# generate clients configs
+
+- name: Generate client configs (local action)
+  delegate_to: localhost
+  file:
+    path: "{{ client_configs_dir | default('./clients') }}"
+    state: directory
+
+- name: Create client configs
+  delegate_to: localhost
+  template:
+    src: client.conf.j2
+    dest: "{{ client_configs_dir }}/{{ item.name }}.conf"
+  with_items: "{{ peers }}"

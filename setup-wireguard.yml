@@ -1,0 +1,12 @@
+---
+- name: Setup WireGuard VPN
+  hosts: wg
+  become: true
+  vars_files:
+    - ./peers.yml
+  vars:
+    wireguard_mode: server
+    wireguard_generate_client_configs: true
+    client_configs_dir: "./clients"
+  roles:
+    - wireguard
