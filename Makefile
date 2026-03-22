@@ -5,9 +5,9 @@ SSH_USER=ansible
 SSH_PASS=ansible123
 DOCKERFILE=Dockerfile
 
-.PHONY: all build run clean info
+.PHONY: all build wg xray clean info
 
-all: build run info
+all: build wg xray info
 
 docker-build:
 	@echo "🔧 Building image from $(DOCKERFILE)..."
@@ -32,5 +32,8 @@ dcoker-clean:
 	-docker rm -f $(CONTAINER_NAME) 2>/dev/null || true
 	-docker rmi $(IMAGE_NAME) 2>/dev/null || true
 
-run:
+wg:
 	ansible-playbook -i inventory.ini setup-wireguard.yml --ask-become-pass
+
+xray:
+	ansible-playbook -i inventory.ini setup-xray.yml --ask-become-pass

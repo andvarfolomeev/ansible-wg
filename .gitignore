@@ -1,3 +1,6 @@
 clients/*
 peers.yml
 inventory.ini
+xray_clients.yml
+.devenv
+.DS_Store

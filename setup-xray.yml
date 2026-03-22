@@ -1,0 +1,10 @@
+---
+- name: Setup Xray VLESS + Reality
+  hosts: wg
+  become: true
+  vars_files:
+    - ./xray_clients.yml
+  vars:
+    xray_client_configs_dir: "./clients/xray"
+  roles:
+    - xray

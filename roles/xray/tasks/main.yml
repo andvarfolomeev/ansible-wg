@@ -1,0 +1,62 @@
+---
+- name: Install dependencies
+  apt:
+    name:
+      - curl
+      - ca-certificates
+      - unzip
+    state: present
+    update_cache: true
+
+- name: Download Xray install script
+  get_url:
+    url: https://github.com/XTLS/Xray-install/raw/main/install-release.sh
+    dest: /tmp/xray-install-release.sh
+    mode: "0755"
+    force: false
+
+- name: Install Xray
+  command: bash /tmp/xray-install-release.sh install
+  args:
+    creates: "{{ xray_bin }}"
+
+- name: Ensure Xray config directory exists
+  file:
+    path: /usr/local/etc/xray
+    state: directory
+    owner: nobody
+    group: nogroup
+    mode: "0750"
+
+- name: Render Xray server config
+  template:
+    src: config.json.j2
+    dest: "{{ xray_config_path }}"
+    owner: nobody
+    group: nogroup
+    mode: "0640"
+  notify: Restart xray
+
+- name: Validate Xray config
+  command: "{{ xray_bin }} run -test -config {{ xray_config_path }}"
+  changed_when: false
+
+- name: Enable and start Xray service
+  systemd:
+    name: "{{ xray_service_name }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Create local client configs directory
+  delegate_to: localhost
+  file:
+    path: "{{ xray_client_configs_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Generate client share links
+  delegate_to: localhost
+  template:
+    src: all_clients.txt.j2
+    dest: "{{ xray_client_configs_dir }}/all_clients.txt"

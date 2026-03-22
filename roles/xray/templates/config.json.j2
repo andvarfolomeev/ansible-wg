@@ -1,0 +1,56 @@
+{
+  "log": {
+    "loglevel": "{{ xray_log_level }}"
+  },
+  "inbounds": [
+    {
+      "listen": "0.0.0.0",
+      "port": {{ xray_server.port }},
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+{% for client in xray_clients %}
+          {
+            "id": "{{ client.uuid }}",
+            "flow": "{{ xray_client_flow }}"
+          }{% if not loop.last %},{% endif %}
+
+{% endfor %}
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "dest": "{{ xray_server.sni }}:443",
+          "xver": 0,
+          "serverNames": [
+            "{{ xray_server.sni }}"
+          ],
+          "privateKey": "{{ xray_server.private_key }}",
+          "shortIds": [
+{% for client in xray_clients %}
+            "{{ client.short_id }}"{% if not loop.last %},{% endif %}
+{% endfor %}
+          ]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    },
+    {
+      "protocol": "blackhole",
+      "tag": "block"
+    }
+  ]
+}

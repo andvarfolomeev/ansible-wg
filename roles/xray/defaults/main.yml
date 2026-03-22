@@ -1,0 +1,9 @@
+---
+xray_version: "latest"
+xray_bin: "/usr/local/bin/xray"
+xray_config_path: "/usr/local/etc/xray/config.json"
+xray_service_name: "xray"
+xray_client_configs_dir: "./clients/xray"
+xray_client_fingerprint: "chrome"
+xray_client_flow: "xtls-rprx-vision"
+xray_log_level: "warning"

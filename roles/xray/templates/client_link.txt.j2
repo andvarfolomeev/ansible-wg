@@ -1,0 +1,1 @@
+vless://{{ item.uuid }}@{{ xray_server.endpoint }}:{{ xray_server.port }}?encryption=none&security=reality&sni={{ xray_server.sni }}&fp={{ xray_client_fingerprint }}&pbk={{ xray_server.public_key }}&sid={{ item.short_id }}&type=tcp&flow={{ xray_client_flow }}#{{ item.name }}
