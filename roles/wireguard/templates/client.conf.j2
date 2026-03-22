@@ -2,6 +2,9 @@
 PrivateKey = {{ item.private_key }}
 Address = {{ item.allowed_ips }}
 DNS = {{ wireguard_dns_servers | default('8.8.8.8') }}
+{% if wireguard_mtu is defined %}
+MTU = {{ wireguard_mtu }}
+{% endif %}
 
 [Peer]
 PublicKey = {{ interface.public_key }}
