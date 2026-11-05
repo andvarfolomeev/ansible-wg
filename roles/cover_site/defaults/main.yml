@@ -1,0 +1,9 @@
+---
+# Required: cover_site_domain
+cover_site_port: 8444
+cover_site_root: "/var/www/{{ cover_site_domain }}"
+cover_site_acme_email: ""
+# Set to the server IP to fail early when DNS does not point at it
+cover_site_expected_address: ""
+# Paths served with text/plain whatever the file name
+cover_site_plain_text_locations: []

@@ -1,0 +1,90 @@
+---
+- name: Check required cover site settings
+  assert:
+    that:
+      - cover_site_domain is defined
+      - cover_site_domain != "CHANGE_ME.example"
+    fail_msg: "Set the real domain in cover_site_domain"
+
+- name: Install nginx and certbot
+  apt:
+    name:
+      - nginx
+      - certbot
+    state: present
+    update_cache: true
+
+- name: Resolve domain on the server
+  command: "getent ahostsv4 {{ cover_site_domain }}"
+  register: cover_site_domain_lookup
+  changed_when: false
+  failed_when: false
+
+- name: Check domain points to the server
+  assert:
+    that:
+      - cover_site_expected_address in cover_site_domain_lookup.stdout
+    fail_msg: "{{ cover_site_domain }} must have a DNS-only A record for {{ cover_site_expected_address }}"
+  when: cover_site_expected_address is match('^[0-9.]+$')
+
+- name: Remove default nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx
+
+- name: Create cover site directory
+  file:
+    path: "{{ cover_site_root }}"
+    state: directory
+    owner: root
+    group: www-data
+    mode: "0750"
+
+- name: Render cover site page
+  template:
+    src: index.html.j2
+    dest: "{{ cover_site_root }}/index.html"
+    owner: root
+    group: www-data
+    mode: "0640"
+
+- name: Render nginx HTTP site
+  template:
+    src: nginx-http.conf.j2
+    dest: /etc/nginx/sites-enabled/cover-site-http.conf
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Enable and start nginx
+  systemd:
+    name: nginx
+    enabled: true
+    state: started
+
+- name: Apply nginx HTTP site before requesting certificate
+  meta: flush_handlers
+
+- name: Request TLS certificate
+  command: >-
+    certbot certonly --webroot --webroot-path {{ cover_site_root }}
+    --domain {{ cover_site_domain }} --agree-tos --non-interactive
+    {{ ('--email ' ~ cover_site_acme_email) if cover_site_acme_email else '--register-unsafely-without-email' }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ cover_site_domain }}/fullchain.pem"
+
+- name: Reload nginx after certificate renewal
+  copy:
+    src: reload-nginx.sh
+    dest: /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+    mode: "0755"
+
+- name: Render nginx HTTPS site
+  template:
+    src: nginx-https.conf.j2
+    dest: /etc/nginx/sites-enabled/cover-site-https.conf
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Apply nginx HTTPS site
+  meta: flush_handlers

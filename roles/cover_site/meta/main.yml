@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  role_name: cover_site
+  author: local
+  description: Static site on localhost behind nginx with a Let's Encrypt certificate
+  min_ansible_version: "2.10"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - jammy
+dependencies: []
