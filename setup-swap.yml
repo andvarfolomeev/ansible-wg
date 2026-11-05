@@ -1,0 +1,9 @@
+---
+- name: Setup swap
+  hosts: wg
+  become: true
+  vars:
+    # The server already has a 1 GiB swap partition (/dev/vda3): 4 GiB in total
+    swap_file_size_mb: 3072
+  roles:
+    - swap

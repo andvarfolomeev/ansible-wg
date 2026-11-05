@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  role_name: swap
+  author: local
+  description: Create a swap file used only under memory pressure
+  min_ansible_version: "2.10"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - jammy
+dependencies: []

@@ -1,0 +1,88 @@
+---
+- name: Check existing swap file
+  stat:
+    path: "{{ swap_file_path }}"
+  register: swap_file_stat
+
+- name: Create swap file when missing or of the wrong size
+  when: swap_file_stat.stat.size | default(0) != swap_file_size_mb | int * 1048576
+  block:
+    - name: Check free disk space
+      command: "df --output=avail -B1 {{ swap_file_path | dirname }}"
+      register: swap_disk_avail
+      changed_when: false
+      check_mode: false
+
+    - name: Check swap file fits on disk
+      assert:
+        that:
+          # The old swap file is removed first, so its space counts as free
+          - >-
+            swap_disk_avail.stdout_lines[-1] | int + swap_file_stat.stat.size | default(0)
+            >= (swap_file_size_mb | int + swap_min_free_disk_mb | int) * 1048576
+        fail_msg: "Not enough disk space for a {{ swap_file_size_mb }} MiB swap file"
+
+    - name: Check whether old swap file is active
+      command: swapon --show=NAME --noheadings
+      register: swap_active_before
+      changed_when: false
+      check_mode: false
+
+    - name: Disable old swap file
+      command: "swapoff {{ swap_file_path }}"
+      when: swap_file_path in swap_active_before.stdout_lines
+
+    - name: Remove old swap file
+      file:
+        path: "{{ swap_file_path }}"
+        state: absent
+
+    # dd instead of fallocate: swapon rejects files with holes on some filesystems
+    - name: Allocate swap file
+      command: "dd if=/dev/zero of={{ swap_file_path }} bs=1M count={{ swap_file_size_mb }}"
+
+- name: Restrict swap file permissions
+  file:
+    path: "{{ swap_file_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  # In check mode the file may not have been allocated
+  when: not ansible_check_mode or swap_file_stat.stat.exists
+
+- name: Check swap signature
+  command: "blkid -o value -s TYPE {{ swap_file_path }}"
+  register: swap_file_type
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Format swap file
+  command: "mkswap {{ swap_file_path }}"
+  when: swap_file_type.stdout != "swap"
+
+- name: Check active swap
+  command: swapon --show=NAME --noheadings
+  register: swap_active
+  changed_when: false
+  check_mode: false
+
+- name: Enable swap file
+  command: "swapon {{ swap_file_path }}"
+  when: swap_file_path not in swap_active.stdout_lines
+
+- name: Enable swap file on boot
+  mount:
+    path: none
+    src: "{{ swap_file_path }}"
+    fstype: swap
+    opts: sw
+    state: present
+
+- name: Use swap only under memory pressure
+  sysctl:
+    name: vm.swappiness
+    value: "{{ swap_swappiness }}"
+    sysctl_file: /etc/sysctl.d/99-swap.conf
+    state: present
+    reload: yes

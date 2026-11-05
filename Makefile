@@ -5,7 +5,7 @@ SSH_USER=ansible
 SSH_PASS=ansible123
 DOCKERFILE=Dockerfile
 
-.PHONY: all build wg xray clean info
+.PHONY: all build wg xray swap clean info
 
 all: build wg xray info
 
@@ -37,3 +37,6 @@ wg:
 
 xray:
 	ansible-playbook -i inventory.ini setup-xray.yml --ask-become-pass
+
+swap:
+	ansible-playbook -i inventory.ini setup-swap.yml --ask-become-pass

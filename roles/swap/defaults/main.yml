@@ -1,0 +1,7 @@
+---
+swap_file_path: /swapfile
+swap_file_size_mb: 4096
+# Disk space that must stay free after the swap file is created
+swap_min_free_disk_mb: 1024
+# Low value: keep processes in RAM and swap only under memory pressure
+swap_swappiness: 10
