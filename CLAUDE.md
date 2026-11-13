@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Does
 
-Ansible playbook that provisions a WireGuard VPN server on Debian 12 and generates client `.conf` files locally. All server and peer configuration lives in `peers.yml`.
+Ansible playbooks for a personal VPN server on Debian 12: WireGuard (`setup-wireguard.yml`), Xray VLESS + Reality behind an nginx cover site (`setup-xray.yml`), and a swap file (`setup-swap.yml`). Client configs and share links are generated locally into `clients/`. All playbooks target the `wg` inventory group.
 
-## Running the Playbook
+## Running the Playbooks
 
 ```bash
 # Deploy to real server (uses inventory.ini)
@@ -32,25 +32,33 @@ The Docker container uses `debian:12` (same as production) with SSH user `ansibl
 ## Generating New Keys
 
 ```bash
-./scripts/wg-keygen.sh [N]   # Generate N key pairs in peers.yml YAML format (default: 1)
+./scripts/wg-keygen.sh [N]              # N WireGuard peer entries for peers.yml (default: 1)
+./scripts/xray-keygen.sh --new [count]  # complete xray_clients.yml with a fresh Reality key pair
+./scripts/xray-keygen.sh [name] [count] # client entries to append to xray_clients.yml
 ```
 
-Output is ready to paste into `peers.yml` and is also copied to clipboard if a clipboard tool is available.
+Output is ready to paste and is also copied to clipboard if a clipboard tool is available.
 
 ## Architecture
 
 ```
-peers.yml              — Single source of truth: server interface + all client peers
-setup-wireguard.yml    — Entry playbook: loads peers.yml, runs the role
-inventory.ini          — Production host (wg group)
+peers.yml              — WireGuard: server interface + all client peers (gitignored, see peers.example.yml)
+xray_clients.yml       — Xray: server settings + clients (gitignored, see xray_clients.example.yml)
+inventory.ini          — Production host, wg group (gitignored, see inventory.example.ini)
+setup-wireguard.yml    — loads peers.yml, runs wireguard
+setup-xray.yml         — loads xray_clients.yml, runs cover_site then xray
+setup-swap.yml         — runs swap
 roles/wireguard/
-  defaults/main.yml    — Role defaults (NAT interface, DNS, keepalive, allowed IPs)
+  defaults/main.yml    — Role defaults (NAT interface, DNS, keepalive, allowed IPs, MTU)
   tasks/main.yml       — Install packages → write server.conf → enable IP forwarding → start WG → generate client configs locally
   handlers/main.yml    — Reload WireGuard: `wg syncconf` on wg0.conf changes, no client drops (Address/MTU/PostUp changes need a manual restart)
   templates/
     server.conf.j2     — wg0.conf: Interface + [Peer] for every entry in peers[]
     client.conf.j2     — Per-peer client config (iterated over peers[])
-clients/               — Generated client .conf files (one per peer, created locally via delegate_to: localhost)
+roles/cover_site/      — nginx static site on 127.0.0.1:8444 with a Let's Encrypt cert; Reality target for unauthenticated connections
+roles/xray/            — Xray install, config, traffic quota timer (xray-quota), weekly geodata timer, share links into clients/xray/
+roles/swap/            — Swap file with low swappiness
+clients/               — Generated client configs (created locally via delegate_to: localhost)
 ```
 
 ### Data Flow
@@ -61,21 +69,15 @@ clients/               — Generated client .conf files (one per peer, created l
 
 | Variable | Where set | Purpose |
 |---|---|---|
-| `wireguard_nat_interface` | `defaults/main.yml` | Outbound NIC for iptables MASQUERADE (default `ens3`) |
+| `wireguard_nat_interface` | `defaults/main.yml` | Outbound NIC for iptables MASQUERADE (default `eth0`) |
 | `wireguard_allowed_ips` | `defaults/main.yml` | AllowedIPs in client configs (default routes all traffic) |
 | `wireguard_dns_servers` | `defaults/main.yml` | DNS in client configs |
 | `client_configs_dir` | playbook / defaults | Local output dir for client `.conf` files |
 
-### IP Addressing Convention
+### Adding a WireGuard Peer
 
-Peers are grouped by user with reserved ranges (visible in `peers.yml` comments):
-- `10.0.0.2–10` — me
-- `10.0.0.11–20` — liza
-- `10.0.0.21–30` — andrey_mam
-- etc.
+Pick the next free `/32` in `10.0.0.0/24` (the server is `.1`), add the entry to `peers.yml`, and re-run the playbook to update `wg0.conf` and regenerate all client configs.
 
-When adding a new peer, pick the next free IP in the appropriate range, add the entry to `peers.yml`, and re-run the playbook to update `wg0.conf` and regenerate all client configs.
+## Secrets
 
-## peers.yml Contains Real Private Keys
-
-`peers.yml` holds actual WireGuard private keys for all devices. It is tracked in git — treat it as sensitive and do not expose it publicly. Consider migrating to Ansible Vault (`ansible-vault encrypt peers.yml`) for production use.
+`peers.yml`, `xray_clients.yml`, `inventory.ini` and `clients/` hold real private keys and server addresses. They are gitignored and have never been committed — keep it that way, never `git add -f` them, and avoid printing their contents.

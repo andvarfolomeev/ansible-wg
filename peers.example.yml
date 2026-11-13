@@ -1,0 +1,22 @@
+---
+# Copy to peers.yml (gitignored) and fill in real keys.
+# Peer entries come from ./scripts/wg-keygen.sh [N], the server key pair can be taken from it too.
+interface:
+  address: 10.0.0.1/24
+  listen_port: 51820
+  private_key: "<server private key>"
+  public_key: "<server public key>"
+  # What clients connect to: public IP or domain, with the port
+  endpoint: "vpn.example.com:51820"
+
+peers:
+  # name becomes clients/<name>.conf, allowed_ips is a unique /32 inside interface.address
+  - name: laptop
+    private_key: "<peer private key>"
+    public_key: "<peer public key>"
+    allowed_ips: 10.0.0.2/32
+
+  - name: phone
+    private_key: "<peer private key>"
+    public_key: "<peer public key>"
+    allowed_ips: 10.0.0.3/32

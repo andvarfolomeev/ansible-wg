@@ -1,73 +1,39 @@
-# Ansible Role: WireGuard
+# Role: wireguard
 
-An Ansible role to set up and configure WireGuard VPN server and client configurations.
+Sets up a WireGuard server `wg0` with NAT on Debian 12 and generates client configs on the control machine.
 
-## Requirements
+## Input
 
-- Ansible 2.9 or higher
-- Python 3.x
-- Supported operating systems:
-  - Ubuntu
-  - Debian
-  - RHEL/CentOS/Rocky Linux 7+
-
-## Role Variables
-
-### Server Configuration
-
-Server interface settings are defined in `peers.yml`:
+The `interface` and `peers` variables, loaded by the playbook from `peers.yml` (see `peers.example.yml`):
 
 ```yaml
 interface:
-  address: 10.0.0.1/24       # Server VPN IP address
-  listen_port: 51820          # WireGuard port
-  private_key: <server_private_key>
-  public_key: <server_public_key>
-  endpoint: <your_public_ip>:51820
-```
+  address: 10.0.0.1/24
+  listen_port: 51820
+  private_key: <server private key>
+  public_key: <server public key>
+  endpoint: vpn.example.com:51820
 
-### Client Configuration Generation
-
-```yaml
-client_configs_dir: "./clients"  # Local directory for client config files
-```
-
-### Peer Configuration
-
-Peers are defined in `peers.yml`:
-
-```yaml
 peers:
-  - name: device_name         # Descriptive name (e.g., laptop, phone)
-    private_key: <private_key>
-    public_key: <public_key>
-    allowed_ips: 10.0.0.2/32  # Unique IP for each client
+  - name: laptop                # client config file name
+    private_key: <private key>
+    public_key: <public key>
+    allowed_ips: 10.0.0.2/32    # unique per peer
 ```
 
-## Example Playbook
+## Variables
 
-```yaml
-- name: Setup WireGuard VPN
-  hosts: vpn_servers
-  become: true
-  vars_files:
-    - ./peers.yml
-  vars:
-    client_configs_dir: "./clients"
-  roles:
-    - wireguard
-```
+| Variable | Default | Purpose |
+|---|---|---|
+| `wireguard_nat_interface` | `eth0` | Outbound interface for iptables MASQUERADE |
+| `client_configs_dir` | `./clients` | Local directory for client configs |
+| `wireguard_dns_servers` | `8.8.8.8, 8.8.4.4` | DNS in client configs |
+| `wireguard_persistent_keepalive` | `25` | Keepalive in client configs |
+| `wireguard_allowed_ips` | `0.0.0.0/0, ::/0` | Routes sent through the tunnel by clients |
+| `wireguard_mtu` | `1420` | MTU for server and clients, remove for auto-detection |
 
-## License
+## Applying changes
 
-MIT
+Changes to `wg0.conf` are applied with `systemctl reload wg-quick@wg0`, which runs `wg syncconf`: peers and keys update without dropping clients. Address, MTU and PostUp/PostDown changes need a manual `systemctl restart wg-quick@wg0`.
 
-## Author Information
-
-Your Name
-
-## Notes
-
-- Remember to generate unique keys for each device using `wg genkey` and `wg pubkey`
-- Keep your private keys secure
-- Each client needs a unique IP address within your VPN subnet
+Without systemd (the Docker test container) the role uses `wg-quick up` and `wg syncconf` directly.

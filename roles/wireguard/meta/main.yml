@@ -1,19 +1,11 @@
 ---
 galaxy_info:
   role_name: wireguard
-  author: your_name
-  description: Ansible role to configure WireGuard VPN server and manage client configurations
-  license: MIT
-  min_ansible_version: 2.9
+  author: local
+  description: WireGuard server with NAT and locally generated client configs
+  min_ansible_version: "2.10"
   platforms:
     - name: Debian
       versions:
         - bookworm
-
-  galaxy_tags:
-    - networking
-    - vpn
-    - wireguard
-    - security
-
 dependencies: []

@@ -1,0 +1,21 @@
+---
+# Copy to xray_clients.yml (gitignored) and fill in real values.
+# ./scripts/xray-keygen.sh --new prints a complete file with fresh keys,
+# ./scripts/xray-keygen.sh [name] [count] prints client entries to append.
+xray_server:
+  # What clients connect to: server IP or a domain resolving to it
+  endpoint: "203.0.113.10"
+  port: 443
+  # Domain of the cover site: needs a DNS-only A record for the server, Let's Encrypt issues its certificate
+  domain: "CHANGE_ME.example"
+  xhttp_path: "/<random hex>"
+  # Reality key pair from `xray x25519`
+  private_key: "<reality private key>"
+  public_key: "<reality public key>"
+
+xray_clients:
+  - name: client1
+    uuid: "<uuid>"
+    short_id: "<16 hex chars>"
+    # Optional, overrides xray_monthly_limit_gb for this client; 0 disables the limit
+    # monthly_limit_gb: 500

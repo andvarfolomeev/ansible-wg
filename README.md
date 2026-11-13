@@ -1,89 +1,71 @@
-# Ansible WireGuard Configuration
+# ansible-wg
 
-A simple Ansible playbook to set up a WireGuard VPN server and manage client configurations.
+Ansible playbooks for a personal VPN server on Debian 12:
 
-## Overview
+| Playbook | Roles | What it does |
+|---|---|---|
+| `setup-wireguard.yml` | `wireguard` | WireGuard server `wg0` with NAT, client `.conf` files generated locally in `clients/` |
+| `setup-xray.yml` | `cover_site`, `xray` | Xray VLESS + Reality (Vision and XHTTP on one port) behind an nginx cover site with a Let's Encrypt certificate, per-client monthly traffic limits, weekly geodata updates; share links generated locally in `clients/xray/` |
+| `setup-swap.yml` | `swap` | Swap file used only under memory pressure |
 
-This project allows you to:
-- Configure a WireGuard VPN server
-- Manage client peers in a single configuration file
-- Generate client configurations automatically
+All playbooks target the `wg` group of `inventory.ini`.
 
 ## Requirements
 
-- Ansible 2.9+
-- Target server with Debian 12
-- Python 3.x
+- Ansible with the `ansible.posix` collection (the full `ansible` package has it)
+- `wireguard-tools` locally for `scripts/wg-keygen.sh`, `xray` and `openssl` for `scripts/xray-keygen.sh`
+- `devenv shell` provides all of the above
 
-## Quick Start
-
-1. Clone this repository
-2. Edit `peers.yml` to configure your server and clients
-3. Run the playbook:
+## Quick start
 
 ```bash
-ansible-playbook -i inventory.ini setup-wireguard.yml
+cp inventory.example.ini inventory.ini
+cp peers.example.yml peers.yml
+cp xray_clients.example.yml xray_clients.yml   # only for Xray
 ```
 
-## Configuration
+Fill them in, then:
 
-### Server Configuration
-
-Edit `peers.yml` to configure your WireGuard server:
-
-```yaml
-interface:
-  address: 10.0.0.1/24       # Server VPN IP address
-  listen_port: 51820          # WireGuard port
-  private_key: <server_private_key>
-  public_key: <server_public_key>
-  endpoint: <your_public_ip>:51820
-```
-
-### Client Peers Configuration
-
-Add client peers to the `peers.yml` file:
-
-```yaml
-peers:
-  - name: device_name         # Descriptive name (e.g., laptop, phone)
-    private_key: <private_key>
-    public_key: <public_key>
-    allowed_ips: 10.0.0.2/32  # Unique IP for each client
-```
-
-Each peer needs:
-- A unique name (used for configuration file names)
-- WireGuard keys (generate with `wg genkey` and `wg pubkey`)
-- A unique IP address within your VPN subnet
-
-## Testing with Docker
-
-A Dockerfile and example inventory are included for testing:
-
-1. Build the test container:
 ```bash
-docker build -t wg-test .
+make wg      # WireGuard
+make xray    # Xray + cover site
+make swap    # swap file
 ```
 
-2. Run the container:
+`inventory.ini`, `peers.yml`, `xray_clients.yml` and `clients/` hold server addresses and private keys. They are gitignored, keep them that way.
+
+## WireGuard
+
+`peers.yml` holds the server `interface` and one `peers` entry per device:
+
 ```bash
-docker run -d -p 2222:22 --privileged --name wg-test wg-test
+./scripts/wg-keygen.sh 2   # two peer entries with fresh keys, also copied to the clipboard
 ```
 
-3. Run the playbook with the Docker inventory:
+Give every peer a unique `/32` inside `interface.address`, re-run `make wg`, and import `clients/<name>.conf` on the device. Peer changes are applied with `wg syncconf` without dropping connected clients. Changes to the server address, MTU or NAT rules need `systemctl restart wg-quick@wg0` on the server.
+
+Role settings live in `roles/wireguard/defaults/main.yml`. Check `wireguard_nat_interface` (default `eth0`) against the server's outbound interface: NAT does not work with the wrong one.
+
+## Xray
+
+`./scripts/xray-keygen.sh --new [count]` prints a complete `xray_clients.yml` with a fresh Reality key pair, `./scripts/xray-keygen.sh [name] [count]` prints new client entries to append.
+
+Before the first run:
+
+- point `xray_server.domain` at the server with a DNS-only A record, the playbook checks it
+- open ports 80 (certificate issuance) and `xray_server.port` (443 by default)
+
+Reality forwards connections without a valid client key to the cover site on `127.0.0.1:8444`, so probes see an ordinary HTTPS blog. Share links for every client and profile are written to `clients/xray/all_clients.txt`.
+
+Traffic limits: `xray_monthly_limit_gb` in `roles/xray/defaults/main.yml`, or `monthly_limit_gb` on a client. Domains and IPs the server refuses to carry (`xray_blocked_domains`, `xray_blocked_ips`, `xray_blocked_ads`) are set there too.
+
+## Testing in Docker
+
 ```bash
+make docker-build
+make docker-run
 ansible-playbook -i inventory_docker_example.ini setup-wireguard.yml
+make docker-clean
 ```
 
-## Security Notes
-
-- Never share your private keys
-- Generate new keys for each device
-- Keep your `peers.yml` file secure
-- Consider using Ansible Vault for production deployments
-
-## Generated Client Configurations
-
-Client configuration files will be generated in the `./clients` directory.
-These files can be directly imported into WireGuard clients on various platforms.
+The container runs Debian 12 without systemd, so the WireGuard role brings `wg0` up with `wg-quick` directly. Password SSH needs `sshpass`.
