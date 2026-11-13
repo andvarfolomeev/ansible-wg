@@ -3,5 +3,6 @@ peers.yml
 inventory.ini
 xray_clients.yml
 .devenv
+.devenv.flake.nix
 .DS_Store
 .idea

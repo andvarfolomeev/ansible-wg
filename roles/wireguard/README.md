@@ -15,10 +15,6 @@ An Ansible role to set up and configure WireGuard VPN server and client configur
 
 ### Server Configuration
 
-```yaml
-wireguard_mode: server  # Set to 'server' for server mode
-```
-
 Server interface settings are defined in `peers.yml`:
 
 ```yaml
@@ -33,8 +29,7 @@ interface:
 ### Client Configuration Generation
 
 ```yaml
-wireguard_generate_client_configs: true  # Set to true to generate client configs
-client_configs_dir: "./clients"          # Directory for client config files
+client_configs_dir: "./clients"  # Local directory for client config files
 ```
 
 ### Peer Configuration
@@ -58,8 +53,6 @@ peers:
   vars_files:
     - ./peers.yml
   vars:
-    wireguard_mode: server
-    wireguard_generate_client_configs: true
     client_configs_dir: "./clients"
   roles:
     - wireguard

@@ -6,7 +6,6 @@
     name:
       - wireguard
       - wireguard-tools
-      - qrencode
       - iproute2
       - iptables
     state: present
@@ -35,7 +34,6 @@
     value: "1"
     state: present
     reload: yes
-  when: wireguard_mode == 'server'
 
 # start WireGuard, config changes are applied by the Reload WireGuard handler
 

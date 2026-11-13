@@ -41,7 +41,7 @@ Output is ready to paste into `peers.yml` and is also copied to clipboard if a c
 
 ```
 peers.yml              — Single source of truth: server interface + all client peers
-setup-wireguard.yml    — Entry playbook: loads peers.yml, sets wireguard_mode=server, runs the role
+setup-wireguard.yml    — Entry playbook: loads peers.yml, runs the role
 inventory.ini          — Production host (wg group)
 roles/wireguard/
   defaults/main.yml    — Role defaults (NAT interface, DNS, keepalive, allowed IPs)
