@@ -2,7 +2,7 @@
 galaxy_info:
   role_name: xray
   author: local
-  description: Install and configure Xray with VLESS + Reality (XTLS)
+  description: Install and configure Xray with VLESS + Reality (Vision and XHTTP) behind a cover site
   min_ansible_version: "2.10"
   platforms:
     - name: Debian

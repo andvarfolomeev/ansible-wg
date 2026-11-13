@@ -1,3 +1,5 @@
 {% for client in xray_clients %}
-{{ client.name }}: vless://{{ client.uuid }}@{{ xray_server.endpoint }}:{{ xray_server.port }}?encryption=none&security=reality&sni={{ xray_server.sni }}&fp={{ xray_client_fingerprint }}&pbk={{ xray_server.public_key }}&sid={{ client.short_id }}&type=tcp&flow={{ xray_client_flow }}#{{ client.name }}
+# {{ client.name }}
+{% include 'client_links.txt.j2' %}
+
 {% endfor %}

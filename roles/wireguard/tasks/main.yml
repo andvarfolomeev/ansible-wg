@@ -72,12 +72,14 @@
 
 - name: Generate client configs (local action)
   delegate_to: localhost
+  become: false
   file:
     path: "{{ client_configs_dir | default('./clients') }}"
     state: directory
 
 - name: Create client configs
   delegate_to: localhost
+  become: false
   template:
     src: client.conf.j2
     dest: "{{ client_configs_dir }}/{{ item.name }}.conf"

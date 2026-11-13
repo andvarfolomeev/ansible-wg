@@ -4,3 +4,4 @@ inventory.ini
 xray_clients.yml
 .devenv
 .DS_Store
+.idea

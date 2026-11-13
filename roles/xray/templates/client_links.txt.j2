@@ -1,1 +1,10 @@
-vless://{{ item.uuid }}@{{ xray_server.endpoint }}:{{ xray_server.port }}?encryption=none&security=reality&sni={{ xray_server.sni }}&fp={{ xray_client_fingerprint }}&pbk={{ xray_server.public_key }}&sid={{ item.short_id }}&type=tcp&flow={{ xray_client_flow }}#{{ item.name }}
+{% for profile in xray_client_profiles %}
+```
+{% if profile.transport == 'xhttp' %}
+vless://{{ client.uuid }}@{{ xray_server.endpoint }}:{{ xray_server.port }}?encryption=none&security=reality&sni={{ xray_server.domain }}&fp={{ profile.fingerprint }}&pbk={{ xray_server.public_key }}&sid={{ client.short_id }}&type=xhttp&mode={{ profile.mode }}&path={{ xray_server.xhttp_path | replace('/', '%2F') }}&extra={{ {'xmux': xray_client_xmux} | to_json | urlencode | replace('/', '%2F') }}#{{ client.name }}-{{ profile.name }}
+{% else %}
+vless://{{ client.uuid }}@{{ xray_server.endpoint }}:{{ xray_server.port }}?encryption=none&security=reality&sni={{ xray_server.domain }}&fp={{ profile.fingerprint }}&pbk={{ xray_server.public_key }}&sid={{ client.short_id }}&type=tcp&flow={{ xray_client_flow }}#{{ client.name }}-{{ profile.name }}
+{% endif %}
+```
+
+{% endfor %}

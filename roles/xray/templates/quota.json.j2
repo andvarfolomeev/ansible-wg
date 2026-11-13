@@ -1,0 +1,6 @@
+{
+{% for client in xray_clients %}
+  "{{ client.name }}": {{ ((client.monthly_limit_gb | default(xray_monthly_limit_gb)) | float * 1000000000) | int }}{% if not loop.last %},{% endif %}
+
+{% endfor %}
+}

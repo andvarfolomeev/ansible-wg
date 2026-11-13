@@ -1,0 +1,7 @@
+[Unit]
+Description=Check Xray monthly traffic limits
+After={{ xray_service_name }}.service
+
+[Service]
+Type=oneshot
+ExecStart={{ xray_quota_bin }}

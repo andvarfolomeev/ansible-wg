@@ -1,0 +1,29 @@
+#!/bin/bash
+# Refreshes geosite.dat and geoip.dat; the old files stay if the config does not load with the new ones.
+set -euo pipefail
+
+url="{{ xray_geodata_url }}"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+cd "$tmp"
+
+for file in geosite-expand.dat.gz geoip-full.dat.gz; do
+  curl -fsSL --retry 3 -o "$file" "$url/$file"
+  curl -fsSL --retry 3 -o "$file.sha256sum" "$url/$file.sha256sum"
+  sha256sum -c --quiet "$file.sha256sum"
+  gzip -d "$file"
+done
+mv geosite-expand.dat geosite.dat
+mv geoip-full.dat geoip.dat
+
+if cmp -s geosite.dat "{{ xray_geodata_dir }}/geosite.dat" && cmp -s geoip.dat "{{ xray_geodata_dir }}/geoip.dat"; then
+  exit 0
+fi
+
+# A category dropped from the lists would keep Xray from starting
+XRAY_LOCATION_ASSET="$tmp" {{ xray_bin }} run -test -config {{ xray_config_path }} >/dev/null
+
+install -m 644 geosite.dat geoip.dat "{{ xray_geodata_dir }}/"
+systemctl restart {{ xray_service_name }}
+# The restart brings back users removed over their traffic limit
+systemctl start xray-quota.service

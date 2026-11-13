@@ -107,17 +107,18 @@ fi
 # Generate Reality x25519 keypair
 # xray x25519 output format:
 #   PrivateKey: <base64>
-#   Password:   <base64>   <- this is the public key for Reality
+#   Password (PublicKey): <base64>   <- this is the public key for Reality
 #   Hash32:     <base64>
 KEYPAIR=$(xray x25519)
 PRIVATE_KEY=$(echo "$KEYPAIR" | grep "^PrivateKey:" | awk '{print $2}')
-PUBLIC_KEY=$(echo "$KEYPAIR" | grep "^Password:" | awk '{print $2}')
+PUBLIC_KEY=$(echo "$KEYPAIR" | grep "^Password" | awk '{print $NF}')
 
 OUTPUT=""
 OUTPUT="${OUTPUT}xray_server:\n"
 OUTPUT="${OUTPUT}  endpoint: \"PASTE_SERVER_IP_HERE\"\n"
 OUTPUT="${OUTPUT}  port: 443\n"
-OUTPUT="${OUTPUT}  sni: \"www.microsoft.com\"\n"
+OUTPUT="${OUTPUT}  domain: \"CHANGE_ME.example\"\n"
+OUTPUT="${OUTPUT}  xhttp_path: \"/$(openssl rand -hex 8)\"\n"
 OUTPUT="${OUTPUT}  private_key: \"${PRIVATE_KEY}\"\n"
 OUTPUT="${OUTPUT}  public_key: \"${PUBLIC_KEY}\"\n"
 OUTPUT="${OUTPUT}\n"

@@ -2,9 +2,19 @@
 - name: Setup Xray VLESS + Reality
   hosts: wg
   become: true
+  # A failed task must not drop a pending Xray restart: the next run would see no change and skip it
+  force_handlers: true
   vars_files:
     - ./xray_clients.yml
   vars:
     xray_client_configs_dir: "./clients/xray"
+    cover_site_domain: "{{ xray_server.domain }}"
+    # Inventory holds the server IP, endpoint is a domain and would skip the DNS check
+    cover_site_expected_address: "{{ inventory_hostname }}"
+    cover_site_port: 8444
+    cover_site_root: "/var/www/{{ xray_server.domain }}"
+    xray_site_port: "{{ cover_site_port }}"
+    xray_site_root: "{{ cover_site_root }}"
   roles:
+    - cover_site
     - xray

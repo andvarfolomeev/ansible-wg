@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+# Adds Xray per-user counters to monthly totals and disconnects users over their limit.
+# Counters live in memory and rmu lasts until restart, so both are kept up here on a timer.
+# Usage: xray-quota [status]
+import fcntl
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+
+XRAY = "{{ xray_bin }}"
+API = "{{ xray_api_listen }}"
+SERVICE = "{{ xray_service_name }}"
+LIMITS_PATH = "{{ xray_quota_limits_path }}"
+STATE_PATH = "{{ xray_quota_state_path }}"
+INBOUND_TAGS = ["vision", "xhttp"]
+
+
+def api(command, *args):
+    return subprocess.run([XRAY, "api", command, "-s", API, *args], capture_output=True, text=True)
+
+
+def collect_counters():
+    result = api("statsquery", "-pattern", "user>>>", "-reset")
+    if result.returncode != 0:
+        sys.exit(f"xray-quota: stats API unavailable: {result.stderr.strip()}")
+    counters = {}
+    for stat in json.loads(result.stdout or "{}").get("stat", []):
+        user = stat["name"].split(">>>")[1]
+        counters[user] = counters.get(user, 0) + int(stat.get("value", 0))
+    return counters
+
+
+def load_state():
+    try:
+        with open(STATE_PATH) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"month": time.strftime("%Y-%m"), "used": {}, "blocked": []}
+
+
+def save_state(state):
+    directory = os.path.dirname(STATE_PATH)
+    with tempfile.NamedTemporaryFile("w", dir=directory, delete=False) as f:
+        json.dump(state, f)
+    os.replace(f.name, STATE_PATH)
+
+
+def restart_xray():
+    subprocess.run(["systemctl", "restart", SERVICE], check=True)
+    for _ in range(30):
+        if api("statsquery", "-pattern", "user>>>").returncode == 0:
+            return
+        time.sleep(1)
+    sys.exit("xray-quota: stats API did not come back after restart")
+
+
+def print_status(state, limits):
+    print(f"Month: {state['month']}")
+    for user, limit in sorted(limits.items()):
+        used = state["used"].get(user, 0) / 10**9
+        limit_text = f"{limit / 10**9:.1f} GB" if limit else "no limit"
+        mark = "  BLOCKED" if user in state["blocked"] else ""
+        print(f"{user:30} {used:10.2f} GB / {limit_text}{mark}")
+
+
+def main():
+    os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
+    with open(STATE_PATH + ".lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+
+        with open(LIMITS_PATH) as f:
+            limits = json.load(f)
+        state = load_state()
+
+        for user, value in collect_counters().items():
+            state["used"][user] = state["used"].get(user, 0) + value
+        month = time.strftime("%Y-%m")
+        if state["month"] != month:
+            state["month"] = month
+            state["used"] = {}
+        save_state(state)
+
+        blocked = sorted(u for u, limit in limits.items() if limit and state["used"].get(u, 0) >= limit)
+        # A restart closes open connections of newly blocked users and brings unblocked ones back
+        if blocked != state["blocked"]:
+            restart_xray()
+            state["blocked"] = blocked
+            save_state(state)
+        # Also repeated on every run, because any other Xray restart returns removed users
+        for user in blocked:
+            for tag in INBOUND_TAGS:
+                api("rmu", f"-tag={tag}", user)
+
+        if sys.argv[1:] == ["status"]:
+            print_status(state, limits)
+
+
+main()

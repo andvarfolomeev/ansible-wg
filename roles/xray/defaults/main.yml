@@ -1,9 +1,57 @@
 ---
-xray_version: "latest"
+xray_version: "26.10.31"
 xray_bin: "/usr/local/bin/xray"
 xray_config_path: "/usr/local/etc/xray/config.json"
 xray_service_name: "xray"
 xray_client_configs_dir: "./clients/xray"
-xray_client_fingerprint: "chrome"
 xray_client_flow: "xtls-rprx-vision"
 xray_log_level: "warning"
+
+# Vision inbound hands non-Vision clients to the XHTTP inbound, both are reachable on one port
+xray_xhttp_socket: "@xray-xhttp"
+
+# Cover site from the cover_site role, Reality forwards unauthenticated connections to it
+xray_site_port: 8444
+xray_site_root: "/var/www/{{ xray_server.domain }}"
+
+# One share link per profile for every client; mode applies to xhttp only.
+# Vision opens a TLS handshake per connection and is the easiest to spot, so it stays last as the fast fallback.
+# The uTLS chrome fingerprint is reported as flagged by TSPU, firefox is used everywhere.
+xray_client_profiles:
+  - { name: xhttp-packet-firefox, transport: xhttp, mode: packet-up, fingerprint: firefox }
+  - { name: xhttp-stream-firefox, transport: xhttp, mode: stream-one, fingerprint: firefox }
+  - { name: vision-firefox, transport: vision, fingerprint: firefox }
+
+# Client-side XHTTP connection reuse, sent in the share link's extra parameter.
+# Few long-lived connections avoid bursts of parallel handshakes to one SNI, which TSPU freezes.
+# Setting any xmux field zeroes the others, so all of them are listed.
+xray_client_xmux:
+  maxConnections: 2
+  cMaxReuseTimes: 0
+  hMaxRequestTimes: "600-900"
+  hMaxReusableSecs: "1800-3000"
+
+# Traffic the server refuses to carry; clients should send it directly instead
+xray_blocked_domains:
+  - "geosite:category-ru"
+  - "domain:ru"
+  - "domain:su"
+  - "domain:xn--p1ai"
+xray_blocked_ips:
+  - "geoip:ru"
+
+# Ad and tracker domains the server drops; only traffic sent through the server is covered, an empty list disables it
+xray_blocked_ads:
+  - "geosite:category-ads-all"
+
+# Weekly refresh of geosite.dat and geoip.dat, the ad lists go stale otherwise
+xray_geodata_url: "https://github.com/XTLS/Xray-rules-dat/releases/latest/download"
+xray_geodata_dir: "/usr/local/share/xray"
+xray_geodata_bin: "/usr/local/bin/xray-geodata"
+
+# Monthly traffic per client in GB (10^9 bytes), override with monthly_limit_gb on a client; 0 disables the limit
+xray_monthly_limit_gb: 300
+xray_api_listen: "127.0.0.1:10085"
+xray_quota_bin: "/usr/local/bin/xray-quota"
+xray_quota_limits_path: "/usr/local/etc/xray/quota.json"
+xray_quota_state_path: "/var/lib/xray-quota/state.json"
