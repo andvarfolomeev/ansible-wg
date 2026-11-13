@@ -1,0 +1,12 @@
+# Per-client Xray traffic, reachable only through WireGuard
+server {
+    listen {{ xray_dashboard_address }}:80;
+    server_name _;
+
+    allow {{ xray_dashboard_allow }};
+    deny all;
+
+    root {{ xray_dashboard_root }};
+    index index.html;
+    add_header Cache-Control "no-store";
+}

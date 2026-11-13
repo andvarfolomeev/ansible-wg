@@ -1,0 +1,230 @@
+#!/usr/bin/env python3
+# Renders the per-client traffic page from xray-quota state and counts connections per site from the Xray access log.
+# Xray has no per-domain byte counters, so sites are ranked by the number of connections.
+import fcntl
+import html
+import json
+import os
+import re
+import subprocess
+import tempfile
+import time
+
+SERVICE = "{{ xray_service_name }}"
+LIMITS_PATH = "{{ xray_quota_limits_path }}"
+QUOTA_STATE_PATH = "{{ xray_quota_state_path }}"
+STATE_PATH = "{{ xray_dashboard_state_path }}"
+PAGE_PATH = "{{ xray_dashboard_root }}/index.html"
+SITES_PER_CLIENT = {{ xray_dashboard_sites_per_client }}
+
+# 2026/11/13 22:46:42.681042 from 1.2.3.4:40302 accepted tcp:example.com:443 [vision -> direct] email: alice
+ACCESS_LINE = re.compile(r" accepted (?:tcp|udp):(\S+) \[\S+ (?:->|>>) (\S+)\] email: (\S+)")
+# Second-level labels under country TLDs, so www.bbc.co.uk groups as bbc.co.uk and not co.uk
+COUNTRY_SECOND_LEVEL = {"ac", "co", "com", "edu", "gov", "net", "or", "org"}
+
+
+def load_json(path, default):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return default
+
+
+def write_atomic(path, text, mode):
+    with tempfile.NamedTemporaryFile("w", dir=os.path.dirname(path), delete=False) as f:
+        f.write(text)
+    os.chmod(f.name, mode)
+    os.replace(f.name, path)
+
+
+def site_of(destination):
+    host = destination.rsplit(":", 1)[0].strip("[]").lower().rstrip(".")
+    # IP addresses stay as they are: clients resolving names themselves send no domain
+    if ":" in host or host.replace(".", "").isdigit():
+        return host
+    labels = host.split(".")
+    keep = 3 if len(labels) > 2 and len(labels[-1]) == 2 and labels[-2] in COUNTRY_SECOND_LEVEL else 2
+    return ".".join(labels[-keep:])
+
+
+def read_access_log(cursor):
+    command = ["journalctl", "--unit", SERVICE, "--output", "cat", "--quiet", "--show-cursor"]
+    result = None
+    if cursor:
+        result = subprocess.run(command + ["--after-cursor", cursor], capture_output=True, text=True)
+    # No cursor on the first run, or the journal no longer has it
+    if result is None or result.returncode != 0:
+        result = subprocess.run(command + ["--since", "-10min"], capture_output=True, text=True, check=True)
+    lines = result.stdout.splitlines()
+    if lines and lines[-1].startswith("-- cursor: "):
+        cursor = lines.pop()[len("-- cursor: "):]
+    return lines, cursor
+
+
+def collect_sites(state):
+    lines, state["cursor"] = read_access_log(state.get("cursor"))
+    for line in lines:
+        match = ACCESS_LINE.search(line)
+        if not match:
+            continue
+        destination, outbound, user = match.groups()
+        counts = state["sites"].setdefault(user, {}).setdefault(site_of(destination), [0, 0])
+        counts[0] += 1
+        if outbound == "block":
+            counts[1] += 1
+    # The long tail of one-off sites would grow the state all month
+    for user, sites in state["sites"].items():
+        if len(sites) > SITES_PER_CLIENT:
+            top = sorted(sites.items(), key=lambda item: item[1][0], reverse=True)[:SITES_PER_CLIENT]
+            state["sites"][user] = dict(top)
+
+
+def format_last_seen(seen, now):
+    if not seen:
+        return "—"
+    # Counters are collected every 5 minutes, traffic since the previous run means the client is online
+    age = now - seen
+    if age < 600:
+        return "online"
+    if age < 3600:
+        return f"{age // 60} min ago"
+    if age < 86400:
+        return f"{age // 3600} h ago"
+    return f"{age // 86400} d ago"
+
+
+STYLE = """
+:root { color-scheme: light dark; --fg: #1d1d1f; --muted: #6e6e73; --bg: #fff; --line: #e5e5ea; --sub: #f5f5f7; --bar: #0a84ff; --bad: #ff3b30; }
+@media (prefers-color-scheme: dark) { :root { --fg: #f5f5f7; --muted: #98989d; --bg: #1c1c1e; --line: #38383a; --sub: #242426; } }
+body { margin: 0 auto; max-width: 960px; padding: 24px 16px; font: 15px/1.4 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+h1 { font-size: 20px; margin: 0 0 4px; }
+p { color: var(--muted); margin: 0 0 20px; }
+.wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bar { width: 120px; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.bar div { height: 100%; background: var(--bar); }
+.blocked > td { color: var(--bad); }
+.blocked .bar div { background: var(--bad); }
+.toggle { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.toggle::before { content: "▸"; display: inline-block; width: 1.2em; color: var(--muted); }
+.toggle[aria-expanded="true"]::before { content: "▾"; }
+.name { padding-left: 1.2em; }
+.sites > td { padding: 0 0 8px 2.2em; background: var(--sub); }
+.sites td { font-size: 14px; }
+.sites th { font-size: 13px; }
+.muted { color: var(--muted); }
+"""
+
+# Rows start collapsed; open ones are remembered for the tab so the 5 minute reload keeps them open
+SCRIPT = """
+const key = "xray-dashboard-open";
+let open = [];
+try { open = JSON.parse(sessionStorage.getItem(key)) || []; } catch (e) { open = []; }
+for (const button of document.querySelectorAll("button.toggle")) {
+  const row = document.getElementById(button.getAttribute("aria-controls"));
+  const show = (on) => { row.hidden = !on; button.setAttribute("aria-expanded", String(on)); };
+  show(open.includes(button.dataset.user));
+  button.addEventListener("click", () => {
+    const on = row.hidden;
+    show(on);
+    open = open.filter((user) => user !== button.dataset.user);
+    if (on) open.push(button.dataset.user);
+    try { sessionStorage.setItem(key, JSON.stringify(open)); } catch (e) { }
+  });
+}
+setTimeout(() => location.reload(), 300000);
+"""
+
+
+def sites_table(sites):
+    rows = []
+    for site, (connections, blocked) in sorted(sites.items(), key=lambda item: item[1][0], reverse=True):
+        if blocked == connections:
+            note = "blocked"
+        elif blocked:
+            note = f"{blocked} blocked"
+        else:
+            note = ""
+        rows.append(
+            f"<tr><td>{html.escape(site)}</td>"
+            f'<td class="num">{connections}</td>'
+            f'<td class="muted">{note}</td></tr>'
+        )
+    return (
+        '<table><thead><tr><th>Site</th><th class="num">Connections</th><th></th></tr></thead><tbody>'
+        + "".join(rows)
+        + "</tbody></table>"
+    )
+
+
+def render_page(quota, limits, sites):
+    now = int(time.time())
+    used = quota.get("used", {})
+    last_seen = quota.get("last_seen", {})
+    users = sorted(limits, key=lambda u: used.get(u, 0), reverse=True)
+    rows = []
+    for index, user in enumerate(users):
+        user_used = used.get(user, 0)
+        limit = limits[user]
+        percent = min(100, user_used * 100 // limit) if limit else 0
+        limit_text = f"{limit / 10**9:.0f} GB" if limit else "no limit"
+        blocked = user in quota.get("blocked", [])
+        user_sites = sites.get(user, {})
+        name = html.escape(user)
+        if user_sites:
+            name_cell = (
+                f'<button class="toggle" type="button" aria-expanded="false" '
+                f'aria-controls="sites-{index}" data-user="{name}">{name}</button>'
+            )
+        else:
+            name_cell = f'<span class="name">{name}</span>'
+        rows.append(
+            f'<tr class="{"blocked" if blocked else ""}">'
+            f"<td>{name_cell}</td>"
+            f'<td class="num">{user_used / 10**9:.2f} GB</td>'
+            f'<td class="num">{limit_text}</td>'
+            f'<td><div class="bar"><div style="width: {percent}%"></div></div></td>'
+            f"<td>{format_last_seen(last_seen.get(user), now)}</td>"
+            f'<td class="num">{len(user_sites) or ""}</td>'
+            f'<td>{"blocked" if blocked else ""}</td>'
+            "</tr>"
+        )
+        if user_sites:
+            rows.append(f'<tr class="sites" id="sites-{index}" hidden><td colspan="7">{sites_table(user_sites)}</td></tr>')
+    total = sum(used.get(u, 0) for u in users) / 10**9
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>Xray traffic</title><style>{STYLE}</style></head><body>"
+        f"<h1>Xray traffic, {html.escape(quota.get('month', ''))}</h1>"
+        f"<p>{len(users)} clients, {total:.1f} GB in total. Updated {time.strftime('%Y-%m-%d %H:%M %Z')}, every 5 minutes. "
+        "Sites are ranked by connections, Xray does not count bytes per site.</p>"
+        '<div class="wrap"><table><thead><tr><th>Client</th><th class="num">Used</th><th class="num">Limit</th>'
+        '<th></th><th>Last seen</th><th class="num">Sites</th><th></th></tr></thead><tbody>'
+        + "".join(rows)
+        + f"</tbody></table></div><script>{SCRIPT}</script></body></html>"
+    )
+
+
+def main():
+    os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
+    with open(STATE_PATH + ".lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+
+        month = time.strftime("%Y-%m")
+        state = load_json(STATE_PATH, {})
+        if state.get("month") != month:
+            state = {"month": month, "cursor": state.get("cursor"), "sites": {}}
+        collect_sites(state)
+        write_atomic(STATE_PATH, json.dumps(state), 0o600)
+
+        quota = load_json(QUOTA_STATE_PATH, {})
+        limits = load_json(LIMITS_PATH, {})
+        write_atomic(PAGE_PATH, render_page(quota, limits, state["sites"]), 0o644)
+
+
+main()

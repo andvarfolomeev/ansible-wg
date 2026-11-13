@@ -1,0 +1,9 @@
+[Unit]
+Description=Update Xray traffic dashboard every 5 minutes
+
+[Timer]
+# A minute after xray-quota, so the page shows its fresh totals
+OnCalendar=*:1/5
+
+[Install]
+WantedBy=timers.target

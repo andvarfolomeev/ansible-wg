@@ -10,3 +10,8 @@
   systemd:
     name: xray-quota.service
     state: started
+
+- name: Update Xray dashboard
+  systemd:
+    name: xray-dashboard.service
+    state: started

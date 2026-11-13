@@ -1,0 +1,7 @@
+[Unit]
+Description=Update Xray traffic dashboard
+After={{ xray_service_name }}.service
+
+[Service]
+Type=oneshot
+ExecStart={{ xray_dashboard_bin }}

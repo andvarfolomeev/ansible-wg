@@ -55,3 +55,13 @@ xray_api_listen: "127.0.0.1:10085"
 xray_quota_bin: "/usr/local/bin/xray-quota"
 xray_quota_limits_path: "/usr/local/etc/xray/quota.json"
 xray_quota_state_path: "/var/lib/xray-quota/state.json"
+
+# Per-client traffic and sites page, updated every 5 minutes and served on the WireGuard server address only:
+# open http://10.0.0.1/ with WireGuard on. An empty address disables it and stops collecting sites.
+xray_dashboard_address: "10.0.0.1"
+xray_dashboard_allow: "10.0.0.0/24"
+xray_dashboard_root: "/var/www/xray-dashboard"
+xray_dashboard_bin: "/usr/local/bin/xray-dashboard"
+xray_dashboard_state_path: "/var/lib/xray-dashboard/state.json"
+# Sites kept per client for the month, ranked by connections
+xray_dashboard_sites_per_client: 300

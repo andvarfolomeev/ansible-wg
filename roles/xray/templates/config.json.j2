@@ -96,6 +96,13 @@
   "routing": {
     "domainStrategy": "IPIfNonMatch",
     "rules": [
+{# Keeps clients away from services on the server itself, such as the Xray API and the dashboard #}
+      {
+        "ruleTag": "block-private",
+        "type": "field",
+        "ip": ["geoip:private"],
+        "outboundTag": "block"
+      },
 {% if xray_blocked_ads %}
       {
         "type": "field",

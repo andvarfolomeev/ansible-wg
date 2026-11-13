@@ -48,7 +48,7 @@ def load_state():
         with open(STATE_PATH) as f:
             return json.load(f)
     except FileNotFoundError:
-        return {"month": time.strftime("%Y-%m"), "used": {}, "blocked": []}
+        return {"month": time.strftime("%Y-%m"), "used": {}, "blocked": [], "last_seen": {}}
 
 
 def save_state(state):
@@ -80,9 +80,14 @@ def main():
         with open(LIMITS_PATH) as f:
             limits = json.load(f)
         state = load_state()
+        # Last traffic per user for the dashboard
+        state.setdefault("last_seen", {})
 
+        now = int(time.time())
         for user, value in collect_counters().items():
             state["used"][user] = state["used"].get(user, 0) + value
+            if value:
+                state["last_seen"][user] = now
         month = time.strftime("%Y-%m")
         if state["month"] != month:
             state["month"] = month

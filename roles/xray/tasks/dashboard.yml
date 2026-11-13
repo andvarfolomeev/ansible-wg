@@ -1,0 +1,77 @@
+---
+# nginx comes from the cover_site role
+- name: Set up traffic dashboard
+  when: xray_dashboard_address | length > 0
+  block:
+    - name: Allow nginx to bind the WireGuard address while wg0 is down
+      sysctl:
+        name: net.ipv4.ip_nonlocal_bind
+        value: "1"
+        state: present
+        reload: true
+
+    - name: Create dashboard directory
+      file:
+        path: "{{ xray_dashboard_root }}"
+        state: directory
+        owner: root
+        group: www-data
+        mode: "0750"
+
+    - name: Install dashboard script
+      template:
+        src: xray-dashboard.py.j2
+        dest: "{{ xray_dashboard_bin }}"
+        owner: root
+        group: root
+        mode: "0755"
+      notify: Update Xray dashboard
+
+    - name: Install dashboard service
+      template:
+        src: xray-dashboard.service.j2
+        dest: /etc/systemd/system/xray-dashboard.service
+        mode: "0644"
+
+    - name: Install dashboard timer
+      copy:
+        src: xray-dashboard.timer
+        dest: /etc/systemd/system/xray-dashboard.timer
+        mode: "0644"
+
+    - name: Enable dashboard timer
+      systemd:
+        name: xray-dashboard.timer
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Render dashboard nginx site
+      template:
+        src: nginx-dashboard.conf.j2
+        dest: /etc/nginx/sites-enabled/xray-dashboard.conf
+        mode: "0644"
+      notify:
+        - Reload nginx
+        - Update Xray dashboard
+
+- name: Remove traffic dashboard
+  when: xray_dashboard_address | length == 0
+  block:
+    # The timer is missing when the dashboard was never enabled
+    - name: Stop dashboard timer
+      systemd:
+        name: xray-dashboard.timer
+        state: stopped
+        enabled: false
+      failed_when: false
+
+    - name: Remove dashboard nginx site and collected sites
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/nginx/sites-enabled/xray-dashboard.conf
+        - "{{ xray_dashboard_root }}"
+        - "{{ xray_dashboard_state_path | dirname }}"
+      notify: Reload nginx

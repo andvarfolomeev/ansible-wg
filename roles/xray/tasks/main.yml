@@ -17,5 +17,7 @@
   tags: quota
 - import_tasks: geodata.yml
   tags: geodata
+- import_tasks: dashboard.yml
+  tags: dashboard
 - import_tasks: links.yml
   tags: links
