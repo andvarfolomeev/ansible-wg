@@ -2,6 +2,8 @@
 - name: Setup WireGuard VPN
   hosts: wg
   become: true
+  # A failed task must not drop a pending WireGuard reload: the next run would see no change and skip it
+  force_handlers: true
   vars_files:
     - ./peers.yml
   vars:

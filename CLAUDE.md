@@ -10,7 +10,7 @@ Ansible playbook that provisions a WireGuard VPN server on Debian 12 and generat
 
 ```bash
 # Deploy to real server (uses inventory.ini)
-make run
+make wg        # also: make xray, make swap
 # or directly:
 ansible-playbook -i inventory.ini setup-wireguard.yml --ask-become-pass
 
@@ -21,12 +21,13 @@ ansible-playbook -i inventory_docker_example.ini setup-wireguard.yml
 ## Docker Testing Environment
 
 ```bash
-make docker-build   # Build ubuntu:ssh-enabled image
-make docker-run     # Start container (exposes SSH on port 2222, needs NET_ADMIN + /dev/net/tun)
+make docker-build   # Build ansible-wg-test image
+make docker-run     # Start privileged container (SSH on port 2222; privileged so sysctl and wg0 work)
 make docker-info    # Print SSH connection details
+make docker-clean   # Remove container and image
 ```
 
-The Docker container uses `ubuntu:22.04` with SSH. The real Dockerfile uses user `node`/`pass`, but `inventory_docker_example.ini` has `user`/`pass` with become password `node1234` — keep these in sync if the Dockerfile changes.
+The Docker container uses `debian:12` (same as production) with SSH user `ansible`/`ansible123`, also the become password. The credentials live in `Makefile` (passed to the Dockerfile as build args) and `inventory_docker_example.ini` — keep them in sync. Password SSH needs `sshpass` (in `devenv.nix`). The container has no systemd, so the role takes its `wg-quick` fallback path there.
 
 ## Generating New Keys
 
@@ -45,6 +46,7 @@ inventory.ini          — Production host (wg group)
 roles/wireguard/
   defaults/main.yml    — Role defaults (NAT interface, DNS, keepalive, allowed IPs)
   tasks/main.yml       — Install packages → write server.conf → enable IP forwarding → start WG → generate client configs locally
+  handlers/main.yml    — Reload WireGuard: `wg syncconf` on wg0.conf changes, no client drops (Address/MTU/PostUp changes need a manual restart)
   templates/
     server.conf.j2     — wg0.conf: Interface + [Peer] for every entry in peers[]
     client.conf.j2     — Per-peer client config (iterated over peers[])

@@ -1,0 +1,20 @@
+---
+# wg syncconf applies peer and key changes without dropping connected clients.
+# Address, MTU and PostUp/PostDown changes need a manual restart of wg-quick@wg0.
+- name: Reload WireGuard via systemd
+  listen: Reload WireGuard
+  systemd:
+    name: wg-quick@wg0
+    state: reloaded
+  when: ansible_service_mgr == "systemd"
+
+# A down interface picks up the new config when it is brought up
+- name: Reload WireGuard manually (no systemd)
+  listen: Reload WireGuard
+  shell: |
+    if ip link show wg0 > /dev/null 2>&1; then
+      wg syncconf wg0 <(wg-quick strip wg0)
+    fi
+  args:
+    executable: /bin/bash
+  when: ansible_service_mgr != "systemd"

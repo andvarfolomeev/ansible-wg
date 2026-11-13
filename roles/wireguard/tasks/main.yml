@@ -25,6 +25,7 @@
     src: server.conf.j2
     dest: /etc/wireguard/wg0.conf
     mode: "0600"
+  notify: Reload WireGuard
 
 # ip forwarding
 
@@ -36,37 +37,25 @@
     reload: yes
   when: wireguard_mode == 'server'
 
-# restart WireGuard
+# start WireGuard, config changes are applied by the Reload WireGuard handler
 
-- name: Check if WireGuard interface is already up
-  shell: ip link show wg0 || echo "not found"
-  register: wg_status
-  changed_when: false
-
-- name: Restart WireGuard interface manually (no systemd)
-  command: "{{ item }}"
-  with_items:
-    - wg-quick down wg0
-    - wg-quick up wg0
-  when: ansible_service_mgr != "systemd" and "not found" not in wg_status.stdout
-
-- name: Bring up WireGuard interface manually (no systemd)
-  command: wg-quick up wg0
-  when: ansible_service_mgr != "systemd" and "not found" in wg_status.stdout
-
-- name: Restart WireGuard via systemd if already running
-  systemd:
-    name: wg-quick@wg0
-    state: restarted
-    enabled: true
-  when: ansible_service_mgr == "systemd" and "not found" not in wg_status.stdout
-
-- name: Enable and start WireGuard via systemd if not running
+- name: Enable and start WireGuard via systemd
   systemd:
     name: wg-quick@wg0
     enabled: true
     state: started
-  when: ansible_service_mgr == "systemd" and "not found" in wg_status.stdout
+  when: ansible_service_mgr == "systemd"
+
+- name: Check if WireGuard interface is up (no systemd)
+  command: ip link show wg0
+  register: wg_status
+  changed_when: false
+  failed_when: false
+  when: ansible_service_mgr != "systemd"
+
+- name: Bring up WireGuard interface manually (no systemd)
+  command: wg-quick up wg0
+  when: ansible_service_mgr != "systemd" and wg_status.rc != 0
 
 # generate clients configs
 
@@ -84,3 +73,6 @@
     src: client.conf.j2
     dest: "{{ client_configs_dir }}/{{ item.name }}.conf"
   with_items: "{{ peers }}"
+  # Keep private keys out of the output
+  loop_control:
+    label: "{{ item.name }}"

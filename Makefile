@@ -1,23 +1,26 @@
-IMAGE_NAME=ubuntu:ssh-enabled
-CONTAINER_NAME=ansible-test-ubuntu
+IMAGE_NAME=ansible-wg-test
+CONTAINER_NAME=ansible-wg-test
 SSH_PORT=2222
+# Keep in sync with inventory_docker_example.ini
 SSH_USER=ansible
 SSH_PASS=ansible123
 DOCKERFILE=Dockerfile
 
-.PHONY: all build wg xray swap clean info
+.PHONY: help docker-build docker-run docker-info docker-clean wg xray swap
 
-all: build wg xray info
+help:
+	@echo "Deploy:  make wg | xray | swap"
+	@echo "Docker:  make docker-build | docker-run | docker-info | docker-clean"
 
 docker-build:
 	@echo "🔧 Building image from $(DOCKERFILE)..."
-	docker build -f $(DOCKERFILE) -t $(IMAGE_NAME) .
+	docker build -f $(DOCKERFILE) --build-arg SSH_USER=$(SSH_USER) --build-arg SSH_PASS=$(SSH_PASS) -t $(IMAGE_NAME) .
 
 docker-run:
 	@echo "🧹 Removing old container (if exists)..."
 	-@docker rm -f $(CONTAINER_NAME) 2>/dev/null || true
 	@echo "🚀 Starting container $(CONTAINER_NAME)..."
-	docker run -d --name $(CONTAINER_NAME) -p $(SSH_PORT):22 --cap-add=NET_ADMIN --device /dev/net/tun $(IMAGE_NAME)
+	docker run -d --name $(CONTAINER_NAME) -p $(SSH_PORT):22 --privileged $(IMAGE_NAME)
 
 docker-info:
 	@CONTAINER_IP=$$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(CONTAINER_NAME)); \
@@ -27,7 +30,7 @@ docker-info:
 	echo "🔐 Password: $(SSH_PASS)"; \
 	echo "🌐 Internal container IP (Docker): $$CONTAINER_IP"
 
-dcoker-clean:
+docker-clean:
 	@echo "🗑 Removing container and image..."
 	-docker rm -f $(CONTAINER_NAME) 2>/dev/null || true
 	-docker rmi $(IMAGE_NAME) 2>/dev/null || true
