@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # Script to generate WireGuard public/private key pairs and output in specified format
 # Usage: ./wg-keygen.sh [number_of_keys]
