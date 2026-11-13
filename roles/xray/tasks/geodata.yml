@@ -1,0 +1,27 @@
+---
+- name: Install Xray geodata update script
+  template:
+    src: xray-geodata.sh.j2
+    dest: "{{ xray_geodata_bin }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install Xray geodata update service
+  template:
+    src: xray-geodata.service.j2
+    dest: /etc/systemd/system/xray-geodata.service
+    mode: "0644"
+
+- name: Install Xray geodata update timer
+  copy:
+    src: xray-geodata.timer
+    dest: /etc/systemd/system/xray-geodata.timer
+    mode: "0644"
+
+- name: Enable Xray geodata update timer
+  systemd:
+    name: xray-geodata.timer
+    enabled: true
+    state: started
+    daemon_reload: true

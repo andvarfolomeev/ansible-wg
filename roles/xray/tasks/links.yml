@@ -1,0 +1,22 @@
+---
+# Subscriptions shared the domain and IP with the server, so they went down together with it
+- name: Remove published subscriptions
+  file:
+    path: "{{ xray_site_root }}/sub"
+    state: absent
+
+- name: Create local client configs directory
+  delegate_to: localhost
+  become: false
+  file:
+    path: "{{ xray_client_configs_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Generate client share links
+  delegate_to: localhost
+  become: false
+  template:
+    src: all_clients.txt.j2
+    dest: "{{ xray_client_configs_dir }}/all_clients.txt"
+    mode: "0600"

@@ -11,6 +11,7 @@ Ansible playbooks for a personal VPN server on Debian 12: WireGuard (`setup-wire
 ```bash
 # Deploy to real server (uses inventory.ini)
 make wg        # also: make xray, make swap
+make xray ARGS="--tags quota"   # extra ansible-playbook flags; xray tags: install, config, quota, geodata, links
 # or directly:
 ansible-playbook -i inventory.ini setup-wireguard.yml --ask-become-pass
 
@@ -56,7 +57,8 @@ roles/wireguard/
     server.conf.j2     — wg0.conf: Interface + [Peer] for every entry in peers[]
     client.conf.j2     — Per-peer client config (iterated over peers[])
 roles/cover_site/      — nginx static site on 127.0.0.1:8444 with a Let's Encrypt cert; Reality target for unauthenticated connections
-roles/xray/            — Xray install, config, traffic quota timer (xray-quota), weekly geodata timer, share links into clients/xray/
+roles/xray/            — Xray VLESS + Reality; tasks split by tag: install, config, quota (xray-quota timer, per-client monthly limits),
+                         geodata (weekly geosite/geoip refresh for the block lists), links (share links into clients/xray/)
 roles/swap/            — Swap file with low swappiness
 clients/               — Generated client configs (created locally via delegate_to: localhost)
 ```

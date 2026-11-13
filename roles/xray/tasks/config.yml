@@ -1,0 +1,33 @@
+---
+# The install script chooses the service user, it differs between its versions
+- name: Find Xray service group
+  shell: 'user=$(systemctl show -P User {{ xray_service_name }}); id -gn "${user:-root}"'
+  register: xray_service_group
+  changed_when: false
+
+- name: Ensure Xray config directory exists
+  file:
+    path: /usr/local/etc/xray
+    state: directory
+    owner: root
+    group: "{{ xray_service_group.stdout }}"
+    mode: "0750"
+
+- name: Render Xray server config
+  template:
+    src: config.json.j2
+    dest: "{{ xray_config_path }}"
+    owner: root
+    group: "{{ xray_service_group.stdout }}"
+    mode: "0640"
+  notify: Restart xray
+
+- name: Validate Xray config
+  command: "{{ xray_bin }} run -test -config {{ xray_config_path }}"
+  changed_when: false
+
+- name: Enable and start Xray service
+  systemd:
+    name: "{{ xray_service_name }}"
+    enabled: true
+    state: started

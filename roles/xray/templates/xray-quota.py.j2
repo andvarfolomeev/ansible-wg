@@ -22,7 +22,17 @@ def api(command, *args):
     return subprocess.run([XRAY, "api", command, "-s", API, *args], capture_output=True, text=True)
 
 
+def wait_for_api():
+    for _ in range(30):
+        if api("statsquery", "-pattern", "user>>>").returncode == 0:
+            return
+        time.sleep(1)
+    sys.exit("xray-quota: stats API unavailable")
+
+
 def collect_counters():
+    # Xray may still be starting when this runs right after a restart
+    wait_for_api()
     result = api("statsquery", "-pattern", "user>>>", "-reset")
     if result.returncode != 0:
         sys.exit(f"xray-quota: stats API unavailable: {result.stderr.strip()}")
@@ -50,11 +60,7 @@ def save_state(state):
 
 def restart_xray():
     subprocess.run(["systemctl", "restart", SERVICE], check=True)
-    for _ in range(30):
-        if api("statsquery", "-pattern", "user>>>").returncode == 0:
-            return
-        time.sleep(1)
-    sys.exit("xray-quota: stats API did not come back after restart")
+    wait_for_api()
 
 
 def print_status(state, limits):

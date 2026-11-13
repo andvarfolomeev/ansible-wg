@@ -1,0 +1,37 @@
+---
+- name: Render Xray traffic limits
+  template:
+    src: quota.json.j2
+    dest: "{{ xray_quota_limits_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Apply Xray traffic limits
+
+- name: Install Xray traffic limit script
+  template:
+    src: xray-quota.py.j2
+    dest: "{{ xray_quota_bin }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Apply Xray traffic limits
+
+- name: Install Xray traffic limit service
+  template:
+    src: xray-quota.service.j2
+    dest: /etc/systemd/system/xray-quota.service
+    mode: "0644"
+
+- name: Install Xray traffic limit timer
+  copy:
+    src: xray-quota.timer
+    dest: /etc/systemd/system/xray-quota.timer
+    mode: "0644"
+
+- name: Enable Xray traffic limit timer
+  systemd:
+    name: xray-quota.timer
+    enabled: true
+    state: started
+    daemon_reload: true

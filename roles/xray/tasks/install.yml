@@ -1,0 +1,33 @@
+---
+- name: Install dependencies
+  apt:
+    name:
+      - curl
+      - ca-certificates
+      - unzip
+      - python3
+    state: present
+    update_cache: true
+
+- name: Check installed Xray version
+  command: "{{ xray_bin }} version"
+  register: xray_installed_version
+  changed_when: false
+  failed_when: false
+
+- name: Download Xray install script
+  get_url:
+    url: https://github.com/XTLS/Xray-install/raw/main/install-release.sh
+    dest: /tmp/xray-install-release.sh
+    mode: "0755"
+    force: true
+  when: ("Xray " ~ xray_version ~ " ") not in xray_installed_version.stdout | default("")
+
+- name: Install Xray
+  command: "bash /tmp/xray-install-release.sh install --version v{{ xray_version }}"
+  when: ("Xray " ~ xray_version ~ " ") not in xray_installed_version.stdout | default("")
+  notify: Restart xray
+
+- name: Reload systemd units
+  systemd:
+    daemon_reload: true

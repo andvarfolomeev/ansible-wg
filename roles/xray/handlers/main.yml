@@ -3,3 +3,10 @@
   systemd:
     name: "{{ xray_service_name }}"
     state: restarted
+
+# Defined after the restart so it runs after it: a restart brings back users removed over their limit
+- name: Apply Xray traffic limits
+  listen: Restart xray
+  systemd:
+    name: xray-quota.service
+    state: started

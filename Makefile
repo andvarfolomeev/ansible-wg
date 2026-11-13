@@ -9,7 +9,7 @@ DOCKERFILE=Dockerfile
 .PHONY: help docker-build docker-run docker-info docker-clean wg xray swap
 
 help:
-	@echo "Deploy:  make wg | xray | swap"
+	@echo "Deploy:  make wg | xray | swap   (extra ansible-playbook flags: ARGS=\"--tags quota --check\")"
 	@echo "Docker:  make docker-build | docker-run | docker-info | docker-clean"
 
 docker-build:
@@ -36,10 +36,10 @@ docker-clean:
 	-docker rmi $(IMAGE_NAME) 2>/dev/null || true
 
 wg:
-	ansible-playbook -i inventory.ini setup-wireguard.yml --ask-become-pass
+	ansible-playbook -i inventory.ini setup-wireguard.yml --ask-become-pass $(ARGS)
 
 xray:
-	ansible-playbook -i inventory.ini setup-xray.yml --ask-become-pass
+	ansible-playbook -i inventory.ini setup-xray.yml --ask-become-pass $(ARGS)
 
 swap:
-	ansible-playbook -i inventory.ini setup-swap.yml --ask-become-pass
+	ansible-playbook -i inventory.ini setup-swap.yml --ask-become-pass $(ARGS)

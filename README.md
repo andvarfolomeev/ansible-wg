@@ -59,6 +59,8 @@ Reality forwards connections without a valid client key to the cover site on `12
 
 Traffic limits: `xray_monthly_limit_gb` in `roles/xray/defaults/main.yml`, or `monthly_limit_gb` on a client. Domains and IPs the server refuses to carry (`xray_blocked_domains`, `xray_blocked_ips`, `xray_blocked_ads`) are set there too.
 
+The role's tasks are tagged `install`, `config`, `quota`, `geodata` and `links`, to run one part: `make xray ARGS="--tags quota"`.
+
 ## Testing in Docker
 
 ```bash
