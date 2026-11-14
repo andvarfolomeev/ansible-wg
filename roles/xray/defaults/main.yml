@@ -1,4 +1,5 @@
 ---
+# With auto-update on this is the oldest version the playbook accepts, a newer one installed by the timer stays
 xray_version: "26.10.31"
 # install-release.sh from XTLS/Xray-install, pinned because it runs as root. To update, take the commit from
 # https://github.com/XTLS/Xray-install/commits/main and run
@@ -53,6 +54,12 @@ xray_blocked_ads:
 xray_geodata_url: "https://github.com/XTLS/Xray-rules-dat/releases/latest/download"
 xray_geodata_dir: "/usr/local/share/xray"
 xray_geodata_bin: "/usr/local/bin/xray-geodata"
+
+# Daily check for a new Xray release, installed and followed by a restart once it is a few days old.
+# The new binary must load the config and start, otherwise the old one is put back.
+xray_update_enabled: true
+xray_update_min_age_days: 3
+xray_update_bin: "/usr/local/bin/xray-update"
 
 # Monthly traffic per client in GB (10^9 bytes), override with monthly_limit_gb on a client; 0 disables the limit
 xray_monthly_limit_gb: 300

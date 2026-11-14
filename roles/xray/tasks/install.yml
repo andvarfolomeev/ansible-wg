@@ -16,7 +16,11 @@
   failed_when: false
 
 - name: Install Xray
-  when: ("Xray " ~ xray_version ~ " ") not in xray_installed_version.stdout | default("")
+  # Auto-update installs newer releases, the playbook must not roll them back
+  when: >-
+    xray_installed_version.rc != 0 or
+    (xray_installed_version.stdout.split()[1] is version(xray_version, '<') if xray_update_enabled
+     else xray_installed_version.stdout.split()[1] != xray_version)
   block:
     - name: Create temporary file for Xray install script
       tempfile:

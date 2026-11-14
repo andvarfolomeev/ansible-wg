@@ -1,0 +1,56 @@
+---
+- name: Set up Xray auto-update
+  when: xray_update_enabled
+  block:
+    - name: Install Xray update script
+      template:
+        src: xray-update.sh.j2
+        dest: "{{ xray_update_bin }}"
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install Xray update service
+      template:
+        src: xray-update.service.j2
+        dest: /etc/systemd/system/xray-update.service
+        mode: "0644"
+
+    - name: Install Xray update timer
+      copy:
+        src: xray-update.timer
+        dest: /etc/systemd/system/xray-update.timer
+        mode: "0644"
+
+    - name: Enable Xray update timer
+      systemd:
+        name: xray-update.timer
+        enabled: true
+        state: started
+        daemon_reload: true
+
+- name: Remove Xray auto-update
+  when: not xray_update_enabled
+  block:
+    # The timer is missing when auto-update was never enabled
+    - name: Stop Xray update timer
+      systemd:
+        name: xray-update.timer
+        state: stopped
+        enabled: false
+      failed_when: false
+
+    - name: Remove Xray update units and script
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/xray-update.service
+        - /etc/systemd/system/xray-update.timer
+        - "{{ xray_update_bin }}"
+      register: xray_update_removed
+
+    - name: Reload systemd units
+      systemd:
+        daemon_reload: true
+      when: xray_update_removed is changed

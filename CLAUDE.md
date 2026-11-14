@@ -11,7 +11,7 @@ Ansible playbooks for a personal VPN server on Debian 12: WireGuard (`setup-wire
 ```bash
 # Deploy to real server (uses inventory.ini)
 make wg        # also: make xray, make swap
-make xray ARGS="--tags quota"   # extra ansible-playbook flags; xray tags: install, config, quota, geodata, dashboard, links
+make xray ARGS="--tags quota"   # extra ansible-playbook flags; xray tags: install, config, quota, geodata, update, dashboard, links
 # or directly:
 ansible-playbook -i inventory.ini setup-wireguard.yml --ask-become-pass
 
@@ -58,7 +58,9 @@ roles/wireguard/
     client.conf.j2     — Per-peer client config (iterated over peers[])
 roles/cover_site/      — nginx static site on 127.0.0.1:8444 with a Let's Encrypt cert; Reality target for unauthenticated connections
 roles/xray/            — Xray VLESS + Reality; tasks split by tag: install, config, quota (xray-quota timer, per-client monthly limits),
-                         geodata (weekly geosite/geoip refresh for the block lists), dashboard (xray-dashboard timer:
+                         geodata (weekly geosite/geoip refresh for the block lists), update (xray-update timer: daily
+                         install of the latest release once it is xray_update_min_age_days old, then restart; rolls back if
+                         the config does not load or Xray does not start; xray_version is then only a minimum), dashboard (xray-dashboard timer:
                          per-client traffic from xray-quota state plus sites per client from the access log in journald,
                          nginx on the WireGuard address 10.0.0.1:80 only; disabling it also turns off the access log),
                          links (share links into clients/xray/)

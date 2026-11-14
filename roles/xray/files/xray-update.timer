@@ -1,0 +1,11 @@
+[Unit]
+Description=Update Xray to the latest release daily
+
+[Timer]
+# Night in Moscow, the restart drops open connections; an hour after the geodata refresh
+OnCalendar=*-*-* 02:00:00 UTC
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,49 @@
+#!/bin/bash
+# Installs the latest Xray release and restarts Xray; the old binary stays if the config does not load with the new one
+# or Xray does not come up with it.
+set -euo pipefail
+
+case "$(dpkg --print-architecture)" in
+  amd64) arch=64 ;;
+  arm64) arch=arm64-v8a ;;
+  *) echo "Unsupported architecture $(dpkg --print-architecture)" >&2; exit 1 ;;
+esac
+
+release="$(curl -fsSL --retry 3 https://api.github.com/repos/XTLS/Xray-core/releases/latest)"
+read -r tag published < <(python3 -c 'import json, sys; r = json.load(sys.stdin); print(r["tag_name"], r["published_at"])' <<<"$release")
+latest="${tag#v}"
+current="$({{ xray_bin }} version | awk 'NR==1 {print $2}')"
+
+if [[ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -n 1)" == "$current" ]]; then
+  exit 0
+fi
+# A broken release is usually replaced within days
+if (( $(date +%s) - $(date -d "$published" +%s) < {{ xray_update_min_age_days }} * 86400 )); then
+  echo "Xray $latest is newer than {{ xray_update_min_age_days }} days, waiting"
+  exit 0
+fi
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+cd "$tmp"
+
+url="https://github.com/XTLS/Xray-core/releases/download/$tag/Xray-linux-$arch.zip"
+curl -fsSL --retry 3 -o xray.zip "$url"
+curl -fsSL --retry 3 -o xray.zip.dgst "$url.dgst"
+echo "$(awk '/^SHA2-256=/ {print $2}' xray.zip.dgst)  xray.zip" | sha256sum -c --quiet
+unzip -q xray.zip xray
+
+XRAY_LOCATION_ASSET="{{ xray_geodata_dir }}" ./xray run -test -config {{ xray_config_path }} >/dev/null
+
+cp -p {{ xray_bin }} xray.old
+install -m 755 -o root -g root xray {{ xray_bin }}
+if ! systemctl restart {{ xray_service_name }} || ! { sleep 3; systemctl is-active --quiet {{ xray_service_name }}; }; then
+  echo "Xray $latest did not start, going back to $current" >&2
+  install -m 755 -o root -g root xray.old {{ xray_bin }}
+  systemctl restart {{ xray_service_name }}
+  systemctl start xray-quota.service
+  exit 1
+fi
+echo "Xray updated from $current to $latest"
+# The restart brings back users removed over their traffic limit
+systemctl start xray-quota.service

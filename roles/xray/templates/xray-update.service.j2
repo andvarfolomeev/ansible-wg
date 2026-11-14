@@ -1,0 +1,8 @@
+[Unit]
+Description=Update Xray to the latest release
+After=network-online.target {{ xray_service_name }}.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ xray_update_bin }}
