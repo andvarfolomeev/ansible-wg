@@ -23,7 +23,8 @@
 - name: Check domain points to the server
   assert:
     that:
-      - cover_site_expected_address in cover_site_domain_lookup.stdout
+      # Whole tokens, so 1.2.3.4 does not match 11.2.3.45
+      - cover_site_expected_address in cover_site_domain_lookup.stdout.split()
     fail_msg: "{{ cover_site_domain }} must have a DNS-only A record for {{ cover_site_expected_address }}"
   when: cover_site_expected_address is match('^[0-9.]+$')
 

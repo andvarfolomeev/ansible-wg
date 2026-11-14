@@ -7,7 +7,7 @@
   vars_files:
     - ./xray_clients.yml
   vars:
-    xray_client_configs_dir: "./clients/xray"
+    xray_client_configs_dir: "{{ playbook_dir }}/clients/xray"
     cover_site_domain: "{{ xray_server.domain }}"
     # Inventory holds the server IP, endpoint is a domain and would skip the DNS check
     cover_site_expected_address: "{{ inventory_hostname }}"

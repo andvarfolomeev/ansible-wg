@@ -7,6 +7,7 @@
       sysctl:
         name: net.ipv4.ip_nonlocal_bind
         value: "1"
+        sysctl_file: /etc/sysctl.d/90-xray-dashboard.conf
         state: present
         reload: true
 
@@ -66,12 +67,22 @@
         enabled: false
       failed_when: false
 
-    - name: Remove dashboard nginx site and collected sites
+    # ip_nonlocal_bind stays, it is harmless and other services may rely on it
+    - name: Remove dashboard nginx site, units, script and collected sites
       file:
         path: "{{ item }}"
         state: absent
       loop:
         - /etc/nginx/sites-enabled/xray-dashboard.conf
+        - /etc/systemd/system/xray-dashboard.service
+        - /etc/systemd/system/xray-dashboard.timer
+        - "{{ xray_dashboard_bin }}"
         - "{{ xray_dashboard_root }}"
         - "{{ xray_dashboard_state_path | dirname }}"
+      register: xray_dashboard_removed
       notify: Reload nginx
+
+    - name: Reload systemd units
+      systemd:
+        daemon_reload: true
+      when: xray_dashboard_removed is changed

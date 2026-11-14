@@ -2,12 +2,12 @@
 Address = {{ interface.address }}
 ListenPort = {{ interface.listen_port }}
 PrivateKey = {{ interface.private_key }}
-{% if wireguard_mtu is defined %}
+{% if wireguard_mtu %}
 MTU = {{ wireguard_mtu }}
 {% endif %}
 
-PostUp   = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o {{ wireguard_nat_interface | default('eth0') }} -j MASQUERADE
-PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o {{ wireguard_nat_interface | default('eth0') }} -j MASQUERADE
+PostUp   = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o {{ wireguard_nat_interface }} -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o {{ wireguard_nat_interface }} -j MASQUERADE
 
 {% for peer in peers %}
 [Peer]

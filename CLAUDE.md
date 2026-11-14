@@ -51,7 +51,7 @@ setup-xray.yml         — loads xray_clients.yml, runs cover_site then xray
 setup-swap.yml         — runs swap
 roles/wireguard/
   defaults/main.yml    — Role defaults (NAT interface, DNS, keepalive, allowed IPs, MTU)
-  tasks/main.yml       — Install packages → write server.conf → enable IP forwarding → start WG → generate client configs locally
+  tasks/main.yml       — Validate peers.yml → install packages → write server.conf → enable IP forwarding → start WG → generate client configs locally
   handlers/main.yml    — Reload WireGuard: `wg syncconf` on wg0.conf changes, no client drops (Address/MTU/PostUp changes need a manual restart)
   templates/
     server.conf.j2     — wg0.conf: Interface + [Peer] for every entry in peers[]
@@ -60,7 +60,8 @@ roles/cover_site/      — nginx static site on 127.0.0.1:8444 with a Let's Encr
 roles/xray/            — Xray VLESS + Reality; tasks split by tag: install, config, quota (xray-quota timer, per-client monthly limits),
                          geodata (weekly geosite/geoip refresh for the block lists), dashboard (xray-dashboard timer:
                          per-client traffic from xray-quota state plus sites per client from the access log in journald,
-                         nginx on the WireGuard address 10.0.0.1:80 only), links (share links into clients/xray/)
+                         nginx on the WireGuard address 10.0.0.1:80 only; disabling it also turns off the access log),
+                         links (share links into clients/xray/)
 roles/swap/            — Swap file with low swappiness
 clients/               — Generated client configs (created locally via delegate_to: localhost)
 ```
@@ -73,7 +74,7 @@ clients/               — Generated client configs (created locally via delegat
 
 | Variable | Where set | Purpose |
 |---|---|---|
-| `wireguard_nat_interface` | `defaults/main.yml` | Outbound NIC for iptables MASQUERADE (default `eth0`) |
+| `wireguard_nat_interface` | `defaults/main.yml` | Outbound NIC for iptables MASQUERADE (default: interface of the default route) |
 | `wireguard_allowed_ips` | `defaults/main.yml` | AllowedIPs in client configs (default routes all traffic) |
 | `wireguard_dns_servers` | `defaults/main.yml` | DNS in client configs |
 | `client_configs_dir` | playbook / defaults | Local output dir for client `.conf` files |

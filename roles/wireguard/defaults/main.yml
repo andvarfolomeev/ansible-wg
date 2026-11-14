@@ -1,11 +1,11 @@
 ---
 # WireGuard role configuration
 
-# Network interface for NAT
-wireguard_nat_interface: eth0
+# Network interface for NAT, the one with the default route
+wireguard_nat_interface: "{{ ansible_facts['default_ipv4']['interface'] }}"
 
 # Local directory for generated client configs
-client_configs_dir: "./clients"
+client_configs_dir: "{{ playbook_dir }}/clients"
 
 # DNS servers for clients
 wireguard_dns_servers: "8.8.8.8, 8.8.4.4"
@@ -16,5 +16,5 @@ wireguard_persistent_keepalive: 25
 # Default allowed IPs (0.0.0.0/0 routes all traffic through VPN)
 wireguard_allowed_ips: "0.0.0.0/0, ::/0"
 
-# MTU for the server and client configs, remove to let wg-quick auto-detect it
+# MTU for the server and client configs, set to "" to let wg-quick auto-detect it
 wireguard_mtu: 1420

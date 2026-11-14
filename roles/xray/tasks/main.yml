@@ -8,6 +8,16 @@
     fail_msg: "Set domain and xhttp_path under xray_server in xray_clients.yml"
   tags: always
 
+# Names are the stats and quota keys, a repeated uuid or short_id makes two clients one
+- name: Check Xray clients are unique
+  assert:
+    that:
+      - xray_clients | map(attribute='name') | unique | length == xray_clients | length
+      - xray_clients | map(attribute='uuid') | unique | length == xray_clients | length
+      - xray_clients | map(attribute='short_id') | unique | length == xray_clients | length
+    fail_msg: "Every client in xray_clients.yml needs its own name, uuid and short_id"
+  tags: always
+
 # Tags run one part, e.g. make xray ARGS="--tags quota"
 - import_tasks: install.yml
   tags: install

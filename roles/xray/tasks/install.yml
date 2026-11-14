@@ -15,18 +15,32 @@
   changed_when: false
   failed_when: false
 
-- name: Download Xray install script
-  get_url:
-    url: https://github.com/XTLS/Xray-install/raw/main/install-release.sh
-    dest: /tmp/xray-install-release.sh
-    mode: "0755"
-    force: true
-  when: ("Xray " ~ xray_version ~ " ") not in xray_installed_version.stdout | default("")
-
 - name: Install Xray
-  command: "bash /tmp/xray-install-release.sh install --version v{{ xray_version }}"
   when: ("Xray " ~ xray_version ~ " ") not in xray_installed_version.stdout | default("")
-  notify: Restart xray
+  block:
+    - name: Create temporary file for Xray install script
+      tempfile:
+        state: file
+        suffix: .sh
+      register: xray_install_script
+
+    - name: Download Xray install script
+      get_url:
+        url: "https://raw.githubusercontent.com/XTLS/Xray-install/{{ xray_install_commit }}/install-release.sh"
+        dest: "{{ xray_install_script.path }}"
+        checksum: "sha256:{{ xray_install_sha256 }}"
+        mode: "0700"
+        force: true
+
+    - name: Run Xray install script
+      command: "bash {{ xray_install_script.path }} install --version v{{ xray_version }}"
+      notify: Restart xray
+  always:
+    - name: Remove Xray install script
+      file:
+        path: "{{ xray_install_script.path }}"
+        state: absent
+      when: xray_install_script.path is defined
 
 - name: Reload systemd units
   systemd:

@@ -44,7 +44,7 @@ make swap    # swap file
 
 Give every peer a unique `/32` inside `interface.address`, re-run `make wg`, and import `clients/<name>.conf` on the device. Peer changes are applied with `wg syncconf` without dropping connected clients. Changes to the server address, MTU or NAT rules need `systemctl restart wg-quick@wg0` on the server.
 
-Role settings live in `roles/wireguard/defaults/main.yml`. Check `wireguard_nat_interface` (default `eth0`) against the server's outbound interface: NAT does not work with the wrong one.
+Role settings live in `roles/wireguard/defaults/main.yml`. `wireguard_nat_interface` defaults to the interface of the server's default route; set it explicitly if outbound traffic leaves through another one, NAT does not work with the wrong one.
 
 ## Xray
 

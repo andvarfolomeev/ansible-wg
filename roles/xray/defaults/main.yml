@@ -1,9 +1,14 @@
 ---
 xray_version: "26.10.31"
+# install-release.sh from XTLS/Xray-install, pinned because it runs as root. To update, take the commit from
+# https://github.com/XTLS/Xray-install/commits/main and run
+# curl -fsSL https://raw.githubusercontent.com/XTLS/Xray-install/<commit>/install-release.sh | sha256sum
+xray_install_commit: "1bce9c3a9630d72521643159080017d1c001bc71"
+xray_install_sha256: "a562d1287cd7bf2871023d4c81bd9031c56fa132956067ba1de126957cc5fb1c"
 xray_bin: "/usr/local/bin/xray"
 xray_config_path: "/usr/local/etc/xray/config.json"
 xray_service_name: "xray"
-xray_client_configs_dir: "./clients/xray"
+xray_client_configs_dir: "{{ playbook_dir }}/clients/xray"
 xray_client_flow: "xtls-rprx-vision"
 xray_log_level: "warning"
 

@@ -8,7 +8,4 @@ galaxy_info:
     - name: Debian
       versions:
         - bookworm
-    - name: Ubuntu
-      versions:
-        - jammy
 dependencies: []

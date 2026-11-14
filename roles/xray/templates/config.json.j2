@@ -1,5 +1,9 @@
 {
   "log": {
+{# The access log goes to journald, where only the dashboard reads it; it names every client and destination #}
+{% if xray_dashboard_address | length == 0 %}
+    "access": "none",
+{% endif %}
     "loglevel": "{{ xray_log_level }}"
   },
   "stats": {},

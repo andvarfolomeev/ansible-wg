@@ -1,13 +1,13 @@
 [Interface]
-PrivateKey = {{ item.private_key }}
-Address = {{ item.allowed_ips }}
-DNS = {{ wireguard_dns_servers | default('8.8.8.8') }}
-{% if wireguard_mtu is defined %}
+PrivateKey = {{ peer.private_key }}
+Address = {{ peer.allowed_ips }}
+DNS = {{ wireguard_dns_servers }}
+{% if wireguard_mtu %}
 MTU = {{ wireguard_mtu }}
 {% endif %}
 
 [Peer]
 PublicKey = {{ interface.public_key }}
 Endpoint = {{ interface.endpoint }}
-AllowedIPs = {{ wireguard_allowed_ips | default('0.0.0.0/0, ::/0') }}
-PersistentKeepalive = {{ wireguard_persistent_keepalive | default(25) }}
+AllowedIPs = {{ wireguard_allowed_ips }}
+PersistentKeepalive = {{ wireguard_persistent_keepalive }}

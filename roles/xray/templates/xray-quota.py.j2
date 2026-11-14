@@ -83,15 +83,16 @@ def main():
         # Last traffic per user for the dashboard
         state.setdefault("last_seen", {})
 
+        # Rollover before adding, or the first collection of a month is wiped with the old totals
+        month = time.strftime("%Y-%m")
+        if state["month"] != month:
+            state["month"] = month
+            state["used"] = {}
         now = int(time.time())
         for user, value in collect_counters().items():
             state["used"][user] = state["used"].get(user, 0) + value
             if value:
                 state["last_seen"][user] = now
-        month = time.strftime("%Y-%m")
-        if state["month"] != month:
-            state["month"] = month
-            state["used"] = {}
         save_state(state)
 
         blocked = sorted(u for u, limit in limits.items() if limit and state["used"].get(u, 0) >= limit)

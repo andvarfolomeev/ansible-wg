@@ -20,11 +20,10 @@
     owner: root
     group: "{{ xray_service_group.stdout }}"
     mode: "0640"
+    # Checked before it replaces the old config, so a broken one never reaches the restart.
+    # The temp file has no extension, xray needs the format spelled out
+    validate: "{{ xray_bin }} run -test -format json -config %s"
   notify: Restart xray
-
-- name: Validate Xray config
-  command: "{{ xray_bin }} run -test -config {{ xray_config_path }}"
-  changed_when: false
 
 - name: Enable and start Xray service
   systemd:

@@ -7,6 +7,6 @@
   vars_files:
     - ./peers.yml
   vars:
-    client_configs_dir: "./clients"
+    client_configs_dir: "{{ playbook_dir }}/clients"
   roles:
     - wireguard
