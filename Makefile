@@ -6,11 +6,12 @@ SSH_USER=ansible
 SSH_PASS=ansible123
 DOCKERFILE=Dockerfile
 
-.PHONY: help docker-build docker-run docker-info docker-clean wg xray swap
+.PHONY: help docker-build docker-run docker-info docker-clean wg xray swap secrets
 
 help:
 	@echo "Deploy:  make wg | xray | swap   (extra ansible-playbook flags: ARGS=\"--tags quota --check\")"
 	@echo "Docker:  make docker-build | docker-run | docker-info | docker-clean"
+	@echo "Checks:  make secrets   (leaked keys in git history: own checks, gitleaks, trufflehog)"
 
 docker-build:
 	@echo "🔧 Building image from $(DOCKERFILE)..."
@@ -43,3 +44,8 @@ xray:
 
 swap:
 	ansible-playbook -i inventory.ini setup-swap.yml --ask-become-pass $(ARGS)
+
+secrets:
+	./scripts/secrets-check.sh
+	gitleaks git --redact --no-banner --log-opts="--all" .
+	trufflehog git file://. --no-verification --fail

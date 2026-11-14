@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Checksum of the pinned Xray install script, not a token"
+regexTarget = "line"
+regexes = ['''xray_install_sha256: "[0-9a-f]{64}"''']

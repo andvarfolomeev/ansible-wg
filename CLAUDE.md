@@ -12,6 +12,7 @@ Ansible playbooks for a personal VPN server on Debian 12: WireGuard (`setup-wire
 # Deploy to real server (uses inventory.ini)
 make wg        # also: make xray, make swap
 make xray ARGS="--tags quota"   # extra ansible-playbook flags; xray tags: install, config, quota, geodata, update, dashboard, links
+make secrets  # leaked keys/secret files in git history and index: scripts/secrets-check.sh + gitleaks + trufflehog
 # or directly:
 ansible-playbook -i inventory.ini setup-wireguard.yml --ask-become-pass
 
@@ -87,4 +88,4 @@ Pick the next free `/32` in `10.0.0.0/24` (the server is `.1`), add the entry to
 
 ## Secrets
 
-`peers.yml`, `xray_clients.yml`, `inventory.ini` and `clients/` hold real private keys and server addresses. They are gitignored and have never been committed — keep it that way, never `git add -f` them, and avoid printing their contents.
+`peers.yml`, `xray_clients.yml`, `inventory.ini` and `clients/` hold real private keys and server addresses. They are gitignored and have never been committed — keep it that way, never `git add -f` them, and avoid printing their contents. Run `make secrets` after changing anything that could carry keys; the gitleaks allowlist in `.gitleaks.toml` covers `xray_install_sha256`.

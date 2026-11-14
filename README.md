@@ -14,6 +14,7 @@ All playbooks target the `wg` group of `inventory.ini`.
 
 - Ansible with the `ansible.posix` collection (the full `ansible` package has it)
 - `wireguard-tools` locally for `scripts/wg-keygen.sh`, `xray` and `openssl` for `scripts/xray-keygen.sh`
+- `gitleaks` and `trufflehog` for `make secrets`
 - `devenv shell` provides all of the above
 
 ## Quick start
@@ -33,6 +34,8 @@ make swap    # swap file
 ```
 
 `inventory.ini`, `peers.yml`, `xray_clients.yml` and `clients/` hold server addresses and private keys. They are gitignored, keep them that way.
+
+`make secrets` checks git history and the index for leaked keys and secret files: `scripts/secrets-check.sh`, then gitleaks (config in `.gitleaks.toml`) and trufflehog without verification, so nothing is sent out. Tools come from `devenv shell`.
 
 ## WireGuard
 
