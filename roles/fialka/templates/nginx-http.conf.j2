@@ -1,0 +1,13 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ fialka_domain }};
+
+    location /.well-known/acme-challenge/ {
+        root {{ fialka_acme_root }};
+    }
+
+    location / {
+        return 301 https://{{ fialka_domain }}$request_uri;
+    }
+}

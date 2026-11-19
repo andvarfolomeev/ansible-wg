@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  role_name: fialka
+  author: local
+  description: fialka-service with PostgreSQL in Docker Compose, TLS in the app with a Let's Encrypt certificate
+  min_ansible_version: "2.10"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - noble
+dependencies: []

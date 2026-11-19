@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Does
 
-Ansible playbooks for a personal VPN server on Debian 12: WireGuard (`setup-wireguard.yml`), Xray VLESS + Reality behind an nginx cover site (`setup-xray.yml`), and a swap file (`setup-swap.yml`). Client configs and share links are generated locally into `clients/`. All playbooks target the `wg` inventory group.
+Ansible playbooks for a personal VPN server on Debian 12: WireGuard (`setup-wireguard.yml`), Xray VLESS + Reality behind an nginx cover site (`setup-xray.yml`), a swap file (`setup-swap.yml`), and the fialka service from the tinkering repo in Docker Compose (`setup-fialka.yml`). Client configs and share links are generated locally into `clients/`. All playbooks target the `wg` inventory group.
 
 ## Running the Playbooks
 
 ```bash
 # Deploy to real server (uses inventory.ini)
-make wg        # also: make xray, make swap
+make wg        # also: make xray, make swap, make fialka
 make xray ARGS="--tags quota"   # extra ansible-playbook flags; xray tags: install, config, quota, geodata, update, dashboard, links
 make secrets  # leaked keys/secret files in git history and index: scripts/secrets-check.sh + gitleaks + trufflehog
 # or directly:
@@ -46,10 +46,12 @@ Output is ready to paste and is also copied to clipboard if a clipboard tool is 
 ```
 peers.yml              — WireGuard: server interface + all client peers (gitignored, see peers.example.yml)
 xray_clients.yml       — Xray: server settings + clients (gitignored, see xray_clients.example.yml)
+fialka.yml             — fialka: domain, image tag, database password (gitignored, see fialka.example.yml)
 inventory.ini          — Production host, wg group (gitignored, see inventory.example.ini)
 setup-wireguard.yml    — loads peers.yml, runs wireguard
 setup-xray.yml         — loads xray_clients.yml, runs cover_site then xray
 setup-swap.yml         — runs swap
+setup-fialka.yml       — loads fialka.yml, runs docker then fialka
 roles/wireguard/
   defaults/main.yml    — Role defaults (NAT interface, DNS, keepalive, allowed IPs, MTU)
   tasks/main.yml       — Validate peers.yml → install packages → write server.conf → enable IP forwarding → start WG → generate client configs locally
@@ -57,7 +59,16 @@ roles/wireguard/
   templates/
     server.conf.j2     — wg0.conf: Interface + [Peer] for every entry in peers[]
     client.conf.j2     — Per-peer client config (iterated over peers[])
-roles/cover_site/      — nginx static site on 127.0.0.1:8444 with a Let's Encrypt cert; Reality target for unauthenticated connections
+roles/cover_site/      — nginx static site on 127.0.0.1:8444 with a Let's Encrypt cert; Reality target for unauthenticated connections.
+                         setup-xray.yml turns on cover_site_proxy_protocol and xray_site_xver together: the listener then
+                         accepts only connections with a PROXY header, keep both in sync
+roles/docker/          — Docker Engine + compose plugin from the Docker apt repo; daemon.json disables iptables management
+                         so WireGuard NAT/FORWARD rules stay untouched, containers must use network_mode: host
+roles/fialka/          — /opt/fialka/compose.yaml: PostgreSQL on 127.0.0.1:5433 and the fialka image from GHCR on 127.0.0.1:8090,
+                         both on the host network. Served on 443 through Xray: Reality forwards non-client connections with
+                         a PROXY header to the cover site listener, nginx serves fialka_domain there by SNI with its own
+                         certbot webroot cert and sets X-Forwarded-For from the PROXY header; the app trusts it from
+                         127.0.0.1 only (per-IP rate limit). Requires setup-xray.yml with the PROXY protocol, checks it first
 roles/xray/            — Xray VLESS + Reality; tasks split by tag: install, config, quota (xray-quota timer, per-client monthly limits),
                          geodata (weekly geosite/geoip refresh for the block lists), update (xray-update timer: daily
                          install of the latest release once it is xray_update_min_age_days old, then restart; rolls back if
@@ -88,4 +99,4 @@ Pick the next free `/32` in `10.0.0.0/24` (the server is `.1`), add the entry to
 
 ## Secrets
 
-`peers.yml`, `xray_clients.yml`, `inventory.ini` and `clients/` hold real private keys and server addresses. They are gitignored and have never been committed — keep it that way, never `git add -f` them, and avoid printing their contents. Run `make secrets` after changing anything that could carry keys; the gitleaks allowlist in `.gitleaks.toml` covers `xray_install_sha256`.
+`peers.yml`, `xray_clients.yml`, `fialka.yml`, `inventory.ini` and `clients/` hold real private keys, passwords and server addresses. They are gitignored and have never been committed — keep it that way, never `git add -f` them, and avoid printing their contents. Run `make secrets` after changing anything that could carry keys; the gitleaks allowlist in `.gitleaks.toml` covers `xray_install_sha256`.

@@ -25,7 +25,7 @@ report() {
 }
 
 # Files that must never be committed (see .gitignore)
-SECRET_FILES='(^|/)(peers|xray_clients)\.yml$|(^|/)inventory\.ini$|^clients/|\.(key|pem)$|(^|/)\.env$|(^|/)id_(rsa|ed25519)'
+SECRET_FILES='(^|/)(peers|xray_clients|fialka)\.yml$|(^|/)inventory\.ini$|^clients/|\.(key|pem)$|(^|/)\.env$|(^|/)id_(rsa|ed25519)'
 report "Secret files in history" "$(
     { git log --all --pretty=format: --name-only; git ls-files; } | sort -u | grep -E "$SECRET_FILES"
 )"

@@ -15,6 +15,9 @@
     cover_site_root: "/var/www/{{ xray_server.domain }}"
     xray_site_port: "{{ cover_site_port }}"
     xray_site_root: "{{ cover_site_root }}"
+    # Reality passes the client address to nginx on cover_site_port: fialka behind it limits by that address
+    cover_site_proxy_protocol: true
+    xray_site_xver: "{{ 1 if cover_site_proxy_protocol else 0 }}"
   roles:
     - cover_site
     - xray

@@ -2,6 +2,7 @@ clients/*
 peers.yml
 inventory.ini
 xray_clients.yml
+fialka.yml
 .devenv
 .devenv.flake.nix
 .DS_Store

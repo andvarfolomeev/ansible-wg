@@ -1,0 +1,51 @@
+# {{ ansible_managed }}
+name: fialka
+
+# Both services use the host network and listen on 127.0.0.1: dockerd runs without iptables,
+# so published ports and bridge NAT are unavailable
+services:
+  postgres:
+    image: {{ fialka_postgres_image }}
+    restart: unless-stopped
+    network_mode: host
+    command: ["postgres", "-c", "listen_addresses=127.0.0.1", "-c", "port={{ fialka_db_port }}"]
+    environment:
+      POSTGRES_DB: fialka
+      POSTGRES_USER: fialka
+      # $ is compose interpolation, $$ is a literal dollar
+      POSTGRES_PASSWORD: {{ fialka_db_password | replace('$', '$$') | to_json }}
+      # By default 127.0.0.1 is trusted, and on the host network that lets any local process in without
+      # a password. The socket inside the container stays trusted for docker compose exec.
+      # Read only when the pgdata volume is initialized, like POSTGRES_PASSWORD
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=trust"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "{{ fialka_db_port }}", "-U", "fialka", "-d", "fialka"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  fialka:
+    image: {{ (fialka_image ~ ':' ~ fialka_image_tag) | to_json }}
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_ADDRESS: 127.0.0.1
+      SERVER_PORT: "{{ fialka_app_port }}"
+      # TLS ends in nginx: the client address comes from X-Forwarded-For, trusted from 127.0.0.1 only
+      SERVER_FORWARD_HEADERS_STRATEGY: native
+      SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES: '127\.0\.0\.1'
+      FIALKA_DB_URL: jdbc:postgresql://127.0.0.1:{{ fialka_db_port }}/fialka
+      FIALKA_DB_USERNAME: fialka
+      FIALKA_DB_PASSWORD: {{ fialka_db_password | replace('$', '$$') | to_json }}
+      FIALKA_CREATES_PER_MINUTE: "{{ fialka_creates_per_minute }}"
+{% if fialka_java_options %}
+      JAVA_TOOL_OPTIONS: {{ fialka_java_options | to_json }}
+{% endif %}
+
+volumes:
+  pgdata:

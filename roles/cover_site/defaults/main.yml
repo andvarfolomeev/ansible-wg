@@ -1,6 +1,8 @@
 ---
 # Required: cover_site_domain
 cover_site_port: 8444
+# The listener expects a PROXY protocol header: set when Reality forwards with xver
+cover_site_proxy_protocol: false
 cover_site_root: "/var/www/{{ cover_site_domain }}"
 cover_site_acme_email: ""
 # Set to the server IP to fail early when DNS does not point at it

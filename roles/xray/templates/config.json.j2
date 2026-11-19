@@ -50,7 +50,7 @@
         "realitySettings": {
           "show": false,
           "target": "127.0.0.1:{{ xray_site_port }}",
-          "xver": 0,
+          "xver": {{ xray_site_xver | int }},
           "serverNames": [
             "{{ xray_server.domain }}"
           ],

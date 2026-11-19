@@ -18,6 +18,9 @@ xray_xhttp_socket: "@xray-xhttp"
 
 # Cover site from the cover_site role, Reality forwards unauthenticated connections to it
 xray_site_port: 8444
+# PROXY protocol version Reality sends to the cover site with the client address, 0 sends none.
+# The cover site listener must accept it: cover_site_proxy_protocol
+xray_site_xver: 0
 xray_site_root: "/var/www/{{ xray_server.domain }}"
 
 # One share link per profile for every client; mode applies to xhttp only.

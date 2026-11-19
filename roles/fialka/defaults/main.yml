@@ -1,0 +1,22 @@
+---
+# Required in fialka.yml: fialka_domain, fialka_image_tag, fialka_db_password
+fialka_image: ghcr.io/andvarfolomeev/tinkering/fialka-service-api
+# Port 443 belongs to Xray. Reality forwards connections without a client key to the cover site
+# listener, nginx there serves fialka_domain with its own certificate and proxies to the app
+fialka_tls_port: 8444
+# The app listens on 127.0.0.1 only and trusts X-Forwarded-For from nginx alone
+fialka_app_port: 8090
+fialka_dir: /opt/fialka
+fialka_acme_root: /var/www/fialka-acme
+fialka_acme_email: ""
+# Set to the server IP to fail early when DNS does not point at it
+fialka_expected_address: ""
+fialka_postgres_image: postgres:17-alpine
+# PostgreSQL listens on 127.0.0.1 only
+fialka_db_port: 5433
+fialka_creates_per_minute: 10
+# Extra JVM flags, e.g. "-Xmx256m"; by default the heap is up to a quarter of RAM
+fialka_java_options: ""
+# Only for a private GHCR package: a token with read:packages
+fialka_registry_username: ""
+fialka_registry_password: ""

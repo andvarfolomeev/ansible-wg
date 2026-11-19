@@ -1,0 +1,23 @@
+# Same listener as the cover site: Reality forwards here with a PROXY protocol header,
+# nginx picks this server by SNI
+server {
+    listen 127.0.0.1:{{ fialka_tls_port }} ssl http2 proxy_protocol;
+    server_name {{ fialka_domain }};
+
+    ssl_certificate /etc/letsencrypt/live/{{ fialka_domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ fialka_domain }}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # Probes are for the server itself, they reach the app on 127.0.0.1 directly
+    location /actuator {
+        return 404;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:{{ fialka_app_port }};
+        proxy_set_header Host $host;
+        # Client address from the PROXY header, replaces whatever the client sent
+        proxy_set_header X-Forwarded-For $proxy_protocol_addr;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}

@@ -1,0 +1,48 @@
+---
+- name: Create apt keyrings and Docker config directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /etc/apt/keyrings
+    - /etc/docker
+
+- name: Download Docker apt key
+  get_url:
+    url: "https://download.docker.com/linux/{{ docker_apt_distribution }}/gpg"
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+# The whole file, not one line: a stale line for another distribution would break every apt update
+- name: Add Docker apt repository
+  copy:
+    content: |
+      deb [arch={{ docker_apt_arch }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/{{ docker_apt_distribution }} {{ ansible_facts.distribution_release }} stable
+    dest: /etc/apt/sources.list.d/docker.list
+    mode: "0644"
+
+# Before the install, so the first start of dockerd already leaves iptables alone:
+# WireGuard NAT and FORWARD rules stay as the wireguard role wrote them.
+# Containers use the host network, so they need no Docker NAT
+- name: Render Docker daemon config
+  copy:
+    src: daemon.json
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  notify: Restart Docker
+
+- name: Install Docker
+  apt:
+    name: "{{ docker_packages }}"
+    state: present
+    update_cache: true
+
+- name: Enable and start Docker
+  systemd:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Apply Docker daemon config
+  meta: flush_handlers

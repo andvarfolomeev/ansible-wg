@@ -1,0 +1,9 @@
+---
+docker_apt_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_facts.architecture] }}"
+# debian or ubuntu: Docker keeps a separate repository for each
+docker_apt_distribution: "{{ ansible_facts.distribution | lower }}"
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-compose-plugin

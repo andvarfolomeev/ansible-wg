@@ -1,5 +1,5 @@
 server {
-    listen 127.0.0.1:{{ cover_site_port }} ssl http2 default_server;
+    listen 127.0.0.1:{{ cover_site_port }} ssl http2 default_server{{ ' proxy_protocol' if cover_site_proxy_protocol else '' }};
     server_name {{ cover_site_domain }};
 
     ssl_certificate /etc/letsencrypt/live/{{ cover_site_domain }}/fullchain.pem;

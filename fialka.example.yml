@@ -1,0 +1,12 @@
+---
+# Copy to fialka.yml (gitignored) and fill in real values.
+# Domain of fialka: needs a DNS-only A record for the server, Let's Encrypt issues its certificate
+fialka_domain: "CHANGE_ME.example"
+fialka_acme_email: ""
+# <version>-<commit> from the summary of the Release workflow run in tinkering
+fialka_image_tag: "0.1.0-<commit>"
+# openssl rand -hex 24
+fialka_db_password: "<random hex>"
+# Only while the GHCR package is private: a classic token with read:packages
+# fialka_registry_username: "andvarfolomeev"
+# fialka_registry_password: "<token>"

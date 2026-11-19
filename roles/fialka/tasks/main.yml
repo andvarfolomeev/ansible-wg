@@ -1,0 +1,167 @@
+---
+- name: Check required fialka settings
+  assert:
+    that:
+      - fialka_domain is defined
+      - fialka_domain != "CHANGE_ME.example"
+      - fialka_image_tag is defined
+      - "'<' not in fialka_image_tag"
+      - fialka_db_password is defined
+      - fialka_db_password | length >= 16
+    fail_msg: "Set fialka_domain, fialka_image_tag and fialka_db_password (16+ characters) in fialka.yml"
+
+- name: Check server architecture
+  assert:
+    that:
+      - ansible_facts.architecture == "x86_64"
+    fail_msg: "The fialka image is built for linux/amd64 only, add arm64 to jib.from.platforms in tinkering"
+
+# fialka shares the listener with the cover site: without the PROXY header from Reality every
+# client would be 127.0.0.1 and share one rate limit
+- name: Check cover site listener accepts PROXY protocol
+  command: grep -q proxy_protocol /etc/nginx/sites-enabled/cover-site-https.conf
+  register: fialka_cover_site_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Require Xray with PROXY protocol to the cover site
+  assert:
+    that:
+      - fialka_cover_site_check.rc == 0
+    fail_msg: "Run make xray first: fialka needs cover_site_proxy_protocol and xray_site_xver from setup-xray.yml"
+
+- name: Install nginx and certbot
+  apt:
+    name:
+      - nginx
+      - certbot
+    state: present
+    update_cache: true
+
+- name: Resolve domain on the server
+  command: "getent ahostsv4 {{ fialka_domain }}"
+  register: fialka_domain_lookup
+  changed_when: false
+  failed_when: false
+
+- name: Check domain points to the server
+  assert:
+    that:
+      # Whole tokens, so 1.2.3.4 does not match 11.2.3.45
+      - fialka_expected_address in fialka_domain_lookup.stdout.split()
+    fail_msg: "{{ fialka_domain }} must have a DNS-only A record for {{ fialka_expected_address }}"
+  when: fialka_expected_address is match('^[0-9.]+$')
+
+- name: Check ufw state
+  command: ufw status
+  register: fialka_ufw_status
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# Ubuntu images may come with ufw enabled; 443 is open for Xray already
+- name: Open HTTP port in ufw for certificates
+  community.general.ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+  when: "'Status: active' in fialka_ufw_status.stdout"
+
+- name: Create ACME challenge directory
+  file:
+    path: "{{ fialka_acme_root }}"
+    state: directory
+    owner: root
+    group: www-data
+    mode: "0750"
+
+- name: Render nginx HTTP site
+  template:
+    src: nginx-http.conf.j2
+    dest: /etc/nginx/sites-enabled/fialka-http.conf
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Enable and start nginx
+  systemd:
+    name: nginx
+    enabled: true
+    state: started
+
+- name: Apply nginx HTTP site before requesting certificate
+  meta: flush_handlers
+
+# Renewals reload nginx through the deploy hook of the cover_site role
+- name: Request TLS certificate
+  command: >-
+    certbot certonly --webroot --webroot-path {{ fialka_acme_root }}
+    --domain {{ fialka_domain }} --agree-tos --non-interactive
+    {{ ('--email ' ~ fialka_acme_email) if fialka_acme_email else '--register-unsafely-without-email' }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ fialka_domain }}/fullchain.pem"
+
+# Left by the setup where the app served TLS on its own port
+- name: Remove app restart hook for certificate renewal
+  file:
+    path: /etc/letsencrypt/renewal-hooks/deploy/restart-fialka.sh
+    state: absent
+
+- name: Create fialka directory
+  file:
+    path: "{{ fialka_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+# Holds the database password: not shown with --diff
+- name: Render compose file
+  template:
+    src: compose.yaml.j2
+    dest: "{{ fialka_dir }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0600"
+  diff: false
+
+- name: Log in to the image registry
+  command: "docker login {{ fialka_image.split('/') | first }} --username {{ fialka_registry_username }} --password-stdin"
+  args:
+    stdin: "{{ fialka_registry_password }}"
+  changed_when: false
+  no_log: true
+  when: fialka_registry_password | length > 0
+
+- name: Start fialka
+  community.docker.docker_compose_v2:
+    project_src: "{{ fialka_dir }}"
+    state: present
+
+- name: Render nginx HTTPS site
+  template:
+    src: nginx-https.conf.j2
+    dest: /etc/nginx/sites-enabled/fialka-https.conf
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Apply nginx HTTPS site
+  meta: flush_handlers
+
+- name: Wait for fialka to become ready
+  uri:
+    url: "http://127.0.0.1:{{ fialka_app_port }}/actuator/health/readiness"
+  register: fialka_readiness
+  until: fialka_readiness.status == 200
+  retries: 30
+  delay: 2
+
+# The whole path: port 443, Reality forwarding, nginx, the app
+- name: Check fialka through port 443
+  uri:
+    url: "https://{{ fialka_domain }}/"
+
+- name: Check actuator is closed from outside
+  uri:
+    url: "https://{{ fialka_domain }}/actuator/health"
+    status_code: 404

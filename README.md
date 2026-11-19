@@ -1,18 +1,19 @@
 # ansible-wg
 
-Ansible playbooks for a personal VPN server on Debian 12:
+Ansible playbooks for a personal VPN server on Debian 12 or Ubuntu 24.04:
 
 | Playbook | Roles | What it does |
 |---|---|---|
 | `setup-wireguard.yml` | `wireguard` | WireGuard server `wg0` with NAT, client `.conf` files generated locally in `clients/` |
 | `setup-xray.yml` | `cover_site`, `xray` | Xray VLESS + Reality (Vision and XHTTP on one port) behind an nginx cover site with a Let's Encrypt certificate, per-client monthly traffic limits, weekly geodata updates; share links generated locally in `clients/xray/` |
 | `setup-swap.yml` | `swap` | Swap file used only under memory pressure |
+| `setup-fialka.yml` | `docker`, `fialka` | [fialka](https://github.com/andvarfolomeev/tinkering) secret links service with PostgreSQL in Docker Compose, HTTPS on 443 behind Xray Reality and nginx with a Let's Encrypt certificate |
 
 All playbooks target the `wg` group of `inventory.ini`.
 
 ## Requirements
 
-- Ansible with the `ansible.posix` collection (the full `ansible` package has it)
+- Ansible with the `ansible.posix`, `community.docker` and `community.general` collections (the full `ansible` package has them)
 - `wireguard-tools` locally for `scripts/wg-keygen.sh`, `xray` and `openssl` for `scripts/xray-keygen.sh`
 - `gitleaks` and `trufflehog` for `make secrets`
 - `devenv shell` provides all of the above
@@ -23,6 +24,7 @@ All playbooks target the `wg` group of `inventory.ini`.
 cp inventory.example.ini inventory.ini
 cp peers.example.yml peers.yml
 cp xray_clients.example.yml xray_clients.yml   # only for Xray
+cp fialka.example.yml fialka.yml               # only for fialka
 ```
 
 Fill them in, then:
@@ -31,9 +33,10 @@ Fill them in, then:
 make wg      # WireGuard
 make xray    # Xray + cover site
 make swap    # swap file
+make fialka  # fialka
 ```
 
-`inventory.ini`, `peers.yml`, `xray_clients.yml` and `clients/` hold server addresses and private keys. They are gitignored, keep them that way.
+`inventory.ini`, `peers.yml`, `xray_clients.yml`, `fialka.yml` and `clients/` hold server addresses and private keys. They are gitignored, keep them that way.
 
 `make secrets` checks git history and the index for leaked keys and secret files: `scripts/secrets-check.sh`, then gitleaks (config in `.gitleaks.toml`) and trufflehog without verification, so nothing is sent out. Tools come from `devenv shell`.
 
@@ -66,6 +69,51 @@ Per-client traffic for the month, limits and last activity are shown on `http://
 
 The role's tasks are tagged `install`, `config`, `quota`, `geodata`, `dashboard` and `links`, to run one part: `make xray ARGS="--tags quota"`.
 
+## fialka
+
+The image is built by the Release workflow in tinkering and pushed to GHCR as
+`ghcr.io/andvarfolomeev/tinkering/fialka-service-api:<version>-<commit>`. Put that tag into `fialka_image_tag`
+in `fialka.yml` and run `make fialka`; a new tag recreates only the app container, the database stays in the
+`pgdata` volume.
+
+Before the first run:
+
+- run `make xray`: fialka needs the PROXY protocol between Reality and the cover site, the playbook checks it
+- point `fialka_domain` at the server with a DNS-only A record, the playbook checks it
+- make the GHCR package public, or set `fialka_registry_username` and `fialka_registry_password` to a token
+  with `read:packages`
+
+fialka is served on `https://<fialka_domain>` through Xray, which owns port 443:
+
+```
+browser ─443─▶ Xray Reality ─(no client key, PROXY header)─▶ nginx 127.0.0.1:8444 ─(SNI)─▶ fialka 127.0.0.1:8090
+```
+
+Reality forwards every connection without a client key to the cover site listener, and with `xver: 1` it
+prepends the client address in a PROXY protocol header. nginx picks the fialka server by SNI, terminates TLS
+with the fialka certificate and sets `X-Forwarded-For` from that header, overwriting what the client sent.
+fialka trusts `X-Forwarded-For` from 127.0.0.1 only and limits link creation per client address. nginx answers
+404 for `/actuator`, health probes are checked on `127.0.0.1:8090` from the server. nginx on port
+80 answers ACME challenges for the domain and redirects everything else to HTTPS; renewals reload nginx through
+the cover site deploy hook.
+
+The cover site listener now accepts only connections with a PROXY header, which Xray sends. Anything that
+talks to `127.0.0.1:8444` directly has to send one too.
+
+Docker runs with `"iptables": false`, so it never touches the WireGuard NAT and FORWARD rules. Both containers
+use the host network and listen on 127.0.0.1 only: PostgreSQL on 5433, fialka on 8090.
+The image is linux/amd64 only, the playbook stops on other architectures.
+
+PostgreSQL takes `fialka_db_password` only when it creates the `pgdata` volume, a later change in `fialka.yml`
+reaches fialka but not the database. Change it in the database first, then run `make fialka`:
+
+```bash
+docker compose -f /opt/fialka/compose.yaml exec postgres psql -U fialka -d fialka -c '\password fialka'
+```
+
+Role settings live in `roles/fialka/defaults/main.yml`: the ports, the rate limit and extra JVM flags
+(`fialka_java_options`, e.g. `-Xmx256m`).
+
 ## Testing in Docker
 
 ```bash
@@ -75,4 +123,4 @@ ansible-playbook -i inventory_docker_example.ini setup-wireguard.yml
 make docker-clean
 ```
 
-The container runs Debian 12 without systemd, so the WireGuard role brings `wg0` up with `wg-quick` directly. Password SSH needs `sshpass`.
+The container runs Debian 12 without systemd, so the WireGuard role brings `wg0` up with `wg-quick` directly. `setup-fialka.yml` does not run there: Docker and nginx need systemd. Password SSH needs `sshpass`.

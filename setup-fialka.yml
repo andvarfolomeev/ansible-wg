@@ -1,0 +1,12 @@
+---
+- name: Setup fialka
+  hosts: wg
+  become: true
+  vars_files:
+    - ./fialka.yml
+  vars:
+    # Inventory holds the server IP
+    fialka_expected_address: "{{ inventory_hostname }}"
+  roles:
+    - docker
+    - fialka

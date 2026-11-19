@@ -1,0 +1,12 @@
+---
+# Defined first so a broken site file fails the run before the reload;
+# a failed reload keeps the old config running but nginx won't start after a reboot
+- name: Check nginx config
+  command: nginx -t
+  changed_when: false
+  listen: Reload nginx
+
+- name: Reload nginx
+  systemd:
+    name: nginx
+    state: reloaded

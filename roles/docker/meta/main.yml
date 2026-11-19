@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  role_name: docker
+  author: local
+  description: Docker Engine and the compose plugin from the Docker apt repository, without iptables management
+  min_ansible_version: "2.10"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - noble
+dependencies: []
